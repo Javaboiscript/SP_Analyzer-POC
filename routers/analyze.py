@@ -44,7 +44,7 @@ def build_stored_procedure_call(
             # Convert empty string, whitespace, or null to None (SQL NULL)
             if val is None or (isinstance(val, str) and val.strip() == ""):
                 val = None
-            elif p.get("type") == "int" and val is not None:
+            elif p.get("type") in ("int", "select") and val is not None:
                 try:
                     val = int(val)
                 except (ValueError, TypeError):

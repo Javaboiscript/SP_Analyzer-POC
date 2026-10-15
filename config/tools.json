@@ -1,123 +1,6 @@
 {
   "tools": [
     {
-      "id": "sales_analyzer",
-      "label": "Sales Analyzer",
-      "icon": "📊",
-      "accentColor": "#FF6B6B",
-      "description": "Executes the Sales Register stored procedure and runs AI analysis on sales, tax, and returns",
-      "storedProcedure": "[Finance].[SalesRegisterReport]",
-      "defaultParams": {
-        "CompanyNo": 1,
-        "CustomerLocationNo": 0,
-        "InvoiceType": 0,
-        "TaxBookNo": 0,
-        "IsMisReport": 0
-      },
-      "params": [
-        {
-          "name": "CompanyNo",
-          "label": "Company Number",
-          "type": "int",
-          "required": true,
-          "default": 1,
-          "description": "Company identifier"
-        },
-        {
-          "name": "FromDate",
-          "label": "From Date",
-          "type": "date",
-          "required": true,
-          "default": "2024-01-01",
-          "description": "Start date for reporting period (YYYY-MM-DD)"
-        },
-        {
-          "name": "ToDate",
-          "label": "To Date",
-          "type": "date",
-          "required": true,
-          "default": "2024-03-31",
-          "description": "End date for reporting period (YYYY-MM-DD)"
-        },
-        {
-          "name": "CustomerLocationNo",
-          "label": "Customer Location",
-          "type": "int",
-          "required": false,
-          "default": 0,
-          "description": "Filter by location (0 = all locations)"
-        },
-        {
-          "name": "InvoiceType",
-          "label": "Invoice Type",
-          "type": "int",
-          "required": false,
-          "default": 0,
-          "description": "0 = All, 1 = Tax Invoices, 2 = Commercial Invoices, 3 = E-1, 4 = Supplementary"
-        },
-        {
-          "name": "TaxBookNo",
-          "label": "Tax Book Number",
-          "type": "int",
-          "required": false,
-          "default": 0,
-          "description": "Tax book filter (0 = all)"
-        },
-        {
-          "name": "IsMisReport",
-          "label": "MIS Report Flag",
-          "type": "int",
-          "required": false,
-          "default": 0,
-          "description": "0 = Clean data only (recommended), 1 = Include UI metadata headers"
-        }
-      ],
-      "prompts": [
-        {
-          "id": "tax_invoice_gst_audit",
-          "label": "GST Compliance & Tax Breakdown Audit",
-          "description": "Audits GST calculations, CGST/SGST/IGST distribution, HSN codes, and tax rate classifications",
-          "systemPrompt": "You are a senior Indian Chartered Accountant and corporate tax auditor. Audit the sales register data returned by the stored procedure for GST compliance, correct CGST/SGST vs IGST split, and tax rate consistency. Output your response strictly conforming to the requested JSON schema.",
-          "userPromptTemplate": "Perform a rigorous GST tax audit on the sales data provided below. Identify any mismatched tax amounts, missing HSN codes, or compliance risks:\n\n{{data}}"
-        },
-        {
-          "id": "sales_returns_leakage",
-          "label": "Sales Returns & Revenue Leakage Analysis",
-          "description": "Analyzes return rates, credit notes, and identifies products/customers with high return ratios",
-          "systemPrompt": "You are a sales operations analyst focusing on revenue leakage, credit note issuance, and customer return patterns. Output your response strictly conforming to the requested JSON schema.",
-          "userPromptTemplate": "Analyze customer returns, credit notes, and invoice deductions in the data below. Identify high-risk products, calculate the return-to-revenue ratio, and suggest controls to prevent revenue leakage:\n\n{{data}}"
-        },
-        {
-          "id": "top_customers_concentration",
-          "label": "Top Customers & Revenue Concentration (Pareto)",
-          "description": "Identifies top revenue-generating customers and calculates 80/20 customer concentration risk",
-          "systemPrompt": "You are a strategic commercial analyst specializing in B2B revenue distribution, Pareto principle (80/20 rule), and customer concentration risk. Output your response strictly conforming to the requested JSON schema.",
-          "userPromptTemplate": "Review the sales register data below. Rank the top 10 customers by Net Amount, compute the cumulative revenue percentage, and evaluate the business concentration risk:\n\n{{data}}"
-        },
-        {
-          "id": "monthly_growth_trend",
-          "label": "Revenue Trend & Velocity Analysis",
-          "description": "Evaluates sales volume growth, seasonality dips, and invoice frequency over time",
-          "systemPrompt": "You are a Chief Financial Officer analyzing sales momentum, seasonality, and invoice velocity. Output your response strictly conforming to the requested JSON schema.",
-          "userPromptTemplate": "Analyze the sales velocity and revenue trends in the following data. Highlight growth patterns, period-end spikes, and provide a projection for the upcoming quarter:\n\n{{data}}"
-        },
-        {
-          "id": "product_category_mix",
-          "label": "Product & HSN Category Margin Mix",
-          "description": "Breaks down sales performance by item descriptions, HSN groupings, and basic vs net values",
-          "systemPrompt": "You are a product line commercial manager. Evaluate product mix, basic invoice values, item groupings, and average realization per category. Output your response strictly conforming to the requested JSON schema.",
-          "userPromptTemplate": "Examine the product lines and item descriptions in the sales dataset below. Highlight top-selling categories, compare Basic Amount vs Net Amount, and identify underperforming lines:\n\n{{data}}"
-        },
-        {
-          "id": "executive_commercial_overview",
-          "label": "Comprehensive Executive Briefing",
-          "description": "High-level summary of total turnover, tax liability, customer distribution, and strategic recommendations",
-          "systemPrompt": "You are the Chief Commercial Officer (CCO). Produce a polished executive briefing that summarizes key financial metrics, high-level risks, and strategic growth opportunities from the sales register. Output your response strictly conforming to the requested JSON schema.",
-          "userPromptTemplate": "Synthesize the entire sales register dataset below into an executive-level briefing for the Board of Directors:\n\n{{data}}"
-        }
-      ]
-    },
-    {
       "id": "po_analyzer",
       "label": "Purchase Order Analyzer",
       "icon": "📋",
@@ -125,7 +8,7 @@
       "description": "Executes PO lifecycle intelligence stored procedure, analyzing vendor delivery performance, rejections, billing status, and open balances",
       "storedProcedure": "[Purchase].[AI_PurchaseOrderInsight]",
       "defaultParams": {
-        "CompanyNo": 4
+        "CompanyNo": null
       },
       "params": [
         {
@@ -146,11 +29,12 @@
         },
         {
           "name": "CompanyNo",
-          "label": "Company Number",
-          "type": "int",
+          "label": "Company",
+          "type": "select",
           "required": false,
-          "default": 4,
-          "description": "Company identifier (required if PO document number is shared across companies)"
+          "default": null,
+          "optionsUrl": "/api/companies",
+          "description": "Select Company name (leave empty / none for all companies)"
         }
       ],
       "prompts": [
@@ -181,35 +65,6 @@
           "description": "Audits PO ordered values vs GRN accepted values vs booked purchase bills and pending liabilities",
           "systemPrompt": "You are a corporate controller and accounts payable auditor. Perform a 3-way match reconciliation between the Purchase Order, Goods Receipt (GRN), and Purchase Bills. Flag unbilled inventory and outstanding liabilities. Output strictly according to the requested JSON schema.",
           "userPromptTemplate": "Perform a 3-way match financial audit on the PO dataset below. Identify any unbilled receipts (PendingBillingQty), compare billed amounts against PO commitments, and review outstanding payables:\n\n{{data}}"
-        }
-      ]
-    },
-    {
-      "id": "indent_analyzer",
-      "label": "Indent Analyzer",
-      "icon": "🔍",
-      "accentColor": "#00D2FF",
-      "description": "Executes internal requisition stored procedures and audits department aging and fulfillment gaps",
-      "storedProcedure": "Procurement.IndentAnalysisReport",
-      "defaultParams": {
-        "CompanyNo": 1
-      },
-      "params": [
-        {
-          "name": "CompanyNo",
-          "label": "Company Number",
-          "type": "int",
-          "required": true,
-          "default": 1
-        }
-      ],
-      "prompts": [
-        {
-          "id": "indent_aging_audit",
-          "label": "Requisition Aging & Bottlenecks",
-          "description": "Reviews open and pending indents for fulfillment bottlenecks",
-          "systemPrompt": "You are an internal audit and procurement specialist focusing on open requisition aging.",
-          "userPromptTemplate": "Analyze the indent requisition data for pending approvals and fulfillment aging:\n\n{{data}}"
         }
       ]
     }

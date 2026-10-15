@@ -12,49 +12,11 @@ const state = {
   currentAnalysis: null,
   currentTables: [],
   activeTableIndex: 0,
-  tableFilterQuery: ""
+  tableFilterQuery: "",
+  companies: []
 };
 
-// Preset examples for quick demonstration
 const TOOL_PRESETS = {
-  sales_analyzer: [
-    {
-      name: "Q1 2024 Audit",
-      values: {
-        CompanyNo: 1,
-        FromDate: "2024-01-01",
-        ToDate: "2024-03-31",
-        CustomerLocationNo: 0,
-        InvoiceType: 0,
-        TaxBookNo: 0,
-        IsMisReport: 0
-      }
-    },
-    {
-      name: "Tax Invoices (Jan 24)",
-      values: {
-        CompanyNo: 1,
-        FromDate: "2024-01-01",
-        ToDate: "2024-01-31",
-        CustomerLocationNo: 0,
-        InvoiceType: 1,
-        TaxBookNo: 0,
-        IsMisReport: 0
-      }
-    },
-    {
-      name: "Commercial Invoices",
-      values: {
-        CompanyNo: 1,
-        FromDate: "2024-01-01",
-        ToDate: "2024-03-31",
-        CustomerLocationNo: 0,
-        InvoiceType: 2,
-        TaxBookNo: 0,
-        IsMisReport: 0
-      }
-    }
-  ],
   po_analyzer: [
     {
       name: "PO #1644 (Active Sample)",
@@ -78,14 +40,6 @@ const TOOL_PRESETS = {
         PONo: 1640,
         CompanyNo: 4,
         PONoYearly: ""
-      }
-    }
-  ],
-  indent_analyzer: [
-    {
-      name: "Company #1 Requisitions",
-      values: {
-        CompanyNo: 1
       }
     }
   ]
@@ -315,6 +269,22 @@ function applyPresetValues(values) {
 }
 
 /**
+ * Fetch Companies for Dynamic Dropdown
+ */
+async function fetchCompanies() {
+  if (state.companies && state.companies.length > 0) return state.companies;
+  try {
+    const res = await fetch("/api/companies");
+    const data = await res.json();
+    state.companies = data.companies || [];
+    return state.companies;
+  } catch (err) {
+    console.error("Failed to fetch companies:", err);
+    return [];
+  }
+}
+
+/**
  * Render Parameters Form
  */
 function renderParametersForm(tool) {
@@ -329,6 +299,50 @@ function renderParametersForm(tool) {
   params.forEach(param => {
     const item = document.createElement("div");
     item.className = "form-item";
+
+    // Handle Select Dropdown (e.g. Company from masterdata.mCompanyMaster)
+    if (param.type === "select") {
+      item.innerHTML = `
+        <div class="form-item-header">
+          <label class="form-item-label" for="param-${param.name}">${param.label || param.name}</label>
+          ${param.required ? '<span class="tag-required">REQUIRED</span>' : '<span class="tag-optional">OPTIONAL</span>'}
+        </div>
+        <select 
+          id="param-${param.name}" 
+          name="${param.name}" 
+          class="minimal-input select-dropdown"
+        >
+          <option value="">-- All Companies (None / Optional) --</option>
+        </select>
+        <div class="example-hint">
+          <span>${param.description ? truncate(param.description, 42) : ''}</span>
+          <span class="example-fill" data-clear="param-${param.name}">Reset</span>
+        </div>
+      `;
+      el.formFieldsContainer.appendChild(item);
+
+      const clearBtn = item.querySelector("[data-clear]");
+      if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+          const sel = document.getElementById(`param-${param.name}`);
+          if (sel) sel.value = "";
+        });
+      }
+
+      fetchCompanies().then(companies => {
+        const selectEl = document.getElementById(`param-${param.name}`);
+        if (!selectEl) return;
+        selectEl.innerHTML = `<option value="">-- All Companies (None / Optional) --</option>`;
+        companies.forEach(c => {
+          const opt = document.createElement("option");
+          opt.value = c.value;
+          opt.textContent = c.label;
+          selectEl.appendChild(opt);
+        });
+        // Default remains null / empty ("") per user requirement
+      });
+      return;
+    }
 
     let inputType = "text";
     if (param.type === "int") inputType = "number";
@@ -433,9 +447,9 @@ function collectParameters() {
       const val = input.value.trim();
       if (val === "") {
         params[p.name] = null;
-      } else if (p.type === "int") {
+      } else if (p.type === "int" || p.type === "select") {
         const parsed = parseInt(val, 10);
-        params[p.name] = isNaN(parsed) ? null : parsed;
+        params[p.name] = isNaN(parsed) ? val : parsed;
       } else {
         params[p.name] = val;
       }

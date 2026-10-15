@@ -1,3 +1,39 @@
-/Procedures
-/.env
-/.venv
+# Byte-compiled / optimized Python files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Local Stored Procedure Scripts & Database Dumps
+/Procedures/
+*.sql.bak
+*.mdf
+*.ldf
+
+# Logs & Temporary Files
+*.log
+scratch/
+tmp/
+*.tmp
+
+# IDE & Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating System Files
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+.DS_Store

@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 class AnalyzeRequest(BaseModel):
     toolId: str = Field(
         ...,
-        description="Identifier of the tool to execute (e.g. 'po_analyzer' or 'sales_analyzer')",
+        description="Identifier of the tool to execute (e.g. 'po_analyzer')",
         json_schema_extra={"example": "po_analyzer"}
     )
     promptId: str = Field(
