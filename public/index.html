@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SP Analyzer // AI Stored Procedure Reasoning Studio</title>
+  <meta name="description" content="AI-Powered Stored Procedure Analyzer & Enterprise Reasoning Studio with Google Gemini and SQL Server.">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+  <!-- Top Global Header -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="header-left">
+        <div class="brand-wrapper" id="brand-home-link" title="Return to Tools Hub">
+          <div class="brand-avatar">🔬</div>
+          <span class="brand-title">SP Analyzer</span>
+        </div>
+
+        <!-- Back to Tools Button (shown when viewing tool workspace) -->
+        <button type="button" class="header-btn-back" id="btn-header-back">
+          ← Back to Tools
+        </button>
+      </div>
+
+      <div class="header-right">
+        <!-- Active Tool Pill (shown when tool selected) -->
+        <div class="active-tool-indicator" id="header-active-tool">
+          <span id="header-tool-icon">📊</span>
+          <span id="header-tool-name">Sales Analyzer</span>
+        </div>
+
+        <!-- Live DB Status -->
+        <div class="status-indicator" id="db-status-badge">
+          <span class="status-dot" id="db-status-dot"></span>
+          <span id="db-status-text">Checking Database...</span>
+        </div>
+
+        <a href="/docs" target="_blank" class="link-api-docs">
+          API ↗
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Master Canvas Area -->
+  <main class="main-canvas">
+
+    <!-- ====================================================================
+         VIEW 1: TOOL SELECTION HUB (Initial Canvas)
+         ==================================================================== -->
+    <section class="view-tool-hub" id="view-tool-hub">
+      <div class="hub-hero">
+        <div class="hub-pill-badge">
+          ✨ Google Gemini Enterprise Reasoning
+        </div>
+        <h1>Select an Enterprise Analysis Domain</h1>
+        <p>
+          Choose a stored procedure intelligence module below to inspect your SQL Server data, test analytical prompts, and generate structured executive reports.
+        </p>
+      </div>
+
+      <!-- Dynamic Tool Cards Grid -->
+      <div class="tool-cards-grid" id="tools-hub-grid">
+        <!-- Populated dynamically from /api/tools -->
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 2: TOOL WORKSPACE (Parameters + Prompts + Results)
+         ==================================================================== -->
+    <section class="view-tool-workspace" id="view-tool-workspace">
+
+      <!-- Workspace Top Bar -->
+      <div class="workspace-top-bar">
+        <div class="workspace-active-tool">
+          <div class="workspace-tool-icon" id="ws-tool-icon">📊</div>
+          <div class="workspace-tool-info">
+            <h2 id="ws-tool-name">Sales Analyzer</h2>
+            <span id="ws-sp-name">[Finance].[SalesRegisterReport]</span>
+          </div>
+        </div>
+
+        <button type="button" class="btn-back-hub" id="btn-ws-back">
+          ← Back to Tools
+        </button>
+      </div>
+
+      <!-- 2-Column Setup Grid: Parameters Form Left, Prompts Right -->
+      <div class="workspace-grid">
+
+        <!-- LEFT COLUMN: Parameters Form -->
+        <div class="workspace-card">
+          <div class="workspace-card-head">
+            <div class="workspace-card-title">
+              <span>01 // Input Parameters</span>
+            </div>
+            <button type="button" id="btn-reset-params" style="background:none; border:none; color:var(--color-terracotta-dark); font-size:11px; font-weight:700; cursor:pointer;">
+              ↺ Reset
+            </button>
+          </div>
+
+          <div class="workspace-card-body">
+            <!-- Preset Pills -->
+            <div class="presets-box">
+              <span class="presets-label">⚡ Example Presets:</span>
+              <div class="presets-chips-row" id="presets-container">
+                <!-- Dynamically populated preset buttons -->
+              </div>
+            </div>
+
+            <!-- Parameters Input Fields -->
+            <form id="analyzer-form" onsubmit="event.preventDefault();">
+              <div class="params-form-grid" id="form-fields-container">
+                <!-- Dynamically populated input fields -->
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Prompts List -->
+        <div class="workspace-card">
+          <div class="workspace-card-head">
+            <div class="workspace-card-title">
+              <span>02 // Analytical Prompt Lens</span>
+            </div>
+            <span id="prompts-count-badge" style="font-size:11px; color:var(--color-espresso-muted); font-weight:600;">6 Prompts</span>
+          </div>
+
+          <div class="workspace-card-body">
+            <p style="font-size:12.5px; color:var(--color-espresso-muted);">
+              Select the analytical focus for Gemini to reason over the returned stored procedure data:
+            </p>
+            <div class="prompts-list" id="prompts-list-container">
+              <!-- Dynamically populated prompt cards -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Action Bar -->
+      <div class="workspace-action-bar">
+        <div class="action-bar-prompt">
+          <span class="action-bar-label">Selected Analytical Lens</span>
+          <span class="action-bar-title" id="action-prompt-name">Select a prompt above</span>
+        </div>
+
+        <button type="button" class="btn-execute-analysis" id="btn-run-analysis">
+          <span>Run AI Analysis</span>
+          <span>➤</span>
+        </button>
+      </div>
+
+      <!-- Loading State Indicator -->
+      <div class="loading-indicator-card" id="loading-box">
+        <div class="pulse-spinner"></div>
+        <div class="loading-text" id="loading-status-text">
+          Executing stored procedure on SQL Server & synthesizing Gemini insights...
+        </div>
+      </div>
+
+      <!-- Error Alert Card -->
+      <div class="error-alert-card" id="error-box">
+        <div class="error-card-title" id="error-title">Execution Error</div>
+        <div class="error-card-detail" id="error-detail"></div>
+      </div>
+
+      <!-- RESULTS PRESENTATION SECTION -->
+      <div class="results-section" id="results-section">
+
+        <!-- Performance & Meta Bar -->
+        <div class="results-meta-bar">
+          <div class="results-meta-left">
+            <span class="results-meta-title">★ Gemini Executive Analysis</span>
+          </div>
+
+          <div class="results-stat-group">
+            <span class="stat-pill">SQL: <strong id="stat-sql-time">0 ms</strong></span>
+            <span class="stat-pill">AI: <strong id="stat-ai-time">0 ms</strong></span>
+            <span class="stat-pill">Rows: <strong id="stat-total-rows">0</strong></span>
+            <span class="stat-pill">Tables: <strong id="stat-table-count">0</strong></span>
+          </div>
+
+          <div class="results-actions-right">
+            <button type="button" class="btn-action-sm" id="btn-copy-report">📋 Copy Briefing</button>
+            <button type="button" class="btn-action-sm" id="btn-scroll-sql">▼ Raw SQL Tables</button>
+          </div>
+        </div>
+
+        <!-- Executive Narrative Summary -->
+        <div class="narrative-card" id="executive-summary-block">
+          <!-- Populated from analysis.executive_summary -->
+        </div>
+
+        <!-- KPI Metrics Cards Deck -->
+        <div class="metrics-deck" id="metrics-deck">
+          <!-- Populated from analysis.key_metrics -->
+        </div>
+
+        <!-- Findings & Recommendations Twin Grid -->
+        <div class="insights-deck">
+          <!-- Findings Column -->
+          <div class="insight-subcard">
+            <div class="insight-subcard-title">
+              <span>🔍 Key Findings & Risk Items</span>
+              <span id="findings-count-pill" style="font-size:11px; color:var(--color-espresso-muted);">0</span>
+            </div>
+            <div class="finding-pill-row" id="findings-list">
+              <!-- Populated from analysis.findings -->
+            </div>
+          </div>
+
+          <!-- Recommendations Column -->
+          <div class="insight-subcard">
+            <div class="insight-subcard-title">
+              <span>🎯 Actionable Recommendations</span>
+              <span id="recs-count-pill" style="font-size:11px; color:var(--color-espresso-muted);">0</span>
+            </div>
+            <div class="finding-pill-row" id="recommendations-list">
+              <!-- Populated from analysis.recommendations -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Supplementary Audit Notes -->
+        <div id="supplementary-notes-container" style="display:none; font-size:12px; color:var(--color-espresso-muted); background:#FFFFFF; border:var(--border-light); padding:12px 16px; border-radius:var(--radius-sm);">
+          <strong>📝 Supplementary Audit Notes:</strong> <span id="supplementary-notes-text"></span>
+        </div>
+
+        <!-- SQL Result Sets Multi-Table Viewer -->
+        <div class="sql-tables-card" id="sql-tables-section">
+          <div class="sql-card-header">
+            <div class="sql-card-title">
+              <span>📊 Raw SQL Result Sets</span>
+              <span class="table-row-count-pill" id="result-sets-badge">0 Tables</span>
+            </div>
+            <button type="button" class="btn-action-sm" id="btn-export-csv" style="font-size:11px;">
+              ⬇ Export CSV
+            </button>
+          </div>
+
+          <!-- Table Tabs -->
+          <div class="table-pill-tabs" id="table-tabs-container">
+            <!-- Dynamically populated table tabs -->
+          </div>
+
+          <!-- Table Filter Toolbar -->
+          <div class="table-toolbar-pastel">
+            <input type="text" class="table-search-pastel" id="table-search-input" placeholder="🔍 Search records in this table...">
+            <span id="table-rows-info" style="font-size:11px; color:var(--color-espresso-muted); font-weight:600;">Showing 0 rows</span>
+          </div>
+
+          <!-- Responsive Scrollable Data Table -->
+          <div class="table-responsive">
+            <table class="pastel-table" id="data-table">
+              <thead id="data-table-head">
+                <!-- Columns -->
+              </thead>
+              <tbody id="data-table-body">
+                <!-- Rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
