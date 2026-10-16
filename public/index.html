@@ -116,6 +116,8 @@
                 <!-- Dynamically populated input fields -->
               </div>
             </form>
+
+
           </div>
         </div>
 
@@ -189,45 +191,87 @@
           </div>
         </div>
 
-        <!-- Executive Narrative Summary -->
-        <div class="narrative-card" id="executive-summary-block">
-          <!-- Populated from analysis.executive_summary -->
-        </div>
-
-        <!-- KPI Metrics Cards Deck -->
-        <div class="metrics-deck" id="metrics-deck">
-          <!-- Populated from analysis.key_metrics -->
-        </div>
-
-        <!-- Findings & Recommendations Twin Grid -->
-        <div class="insights-deck">
-          <!-- Findings Column -->
-          <div class="insight-subcard">
-            <div class="insight-subcard-title">
-              <span>🔍 Key Findings & Risk Items</span>
-              <span id="findings-count-pill" style="font-size:11px; color:var(--color-espresso-muted);">0</span>
-            </div>
-            <div class="finding-pill-row" id="findings-list">
-              <!-- Populated from analysis.findings -->
+        <!-- Unstructured Raw AI Response Block (shown when Custom Prompt is executed without schema enforcement) -->
+        <div class="raw-analysis-container" id="raw-analysis-container" style="display:none;">
+          <div class="raw-analysis-header">
+            <div class="raw-analysis-title">
+              <span class="raw-analysis-badge">✍️ Custom Prompt Output</span>
+              <span class="raw-analysis-subtitle">Direct Unconstrained LLM Analysis</span>
             </div>
           </div>
-
-          <!-- Recommendations Column -->
-          <div class="insight-subcard">
-            <div class="insight-subcard-title">
-              <span>🎯 Actionable Recommendations</span>
-              <span id="recs-count-pill" style="font-size:11px; color:var(--color-espresso-muted);">0</span>
-            </div>
-            <div class="finding-pill-row" id="recommendations-list">
-              <!-- Populated from analysis.recommendations -->
-            </div>
+          <div class="raw-analysis-content" id="raw-analysis-content">
+            <!-- Rendered Markdown from Gemini -->
           </div>
         </div>
 
-        <!-- Supplementary Audit Notes -->
-        <div id="supplementary-notes-container" style="display:none; font-size:12px; color:var(--color-espresso-muted); background:#FFFFFF; border:var(--border-light); padding:12px 16px; border-radius:var(--radius-sm);">
-          <strong>📝 Supplementary Audit Notes:</strong> <span id="supplementary-notes-text"></span>
+        <!-- Structured Results Container (shown for predefined prompt templates) -->
+        <div id="structured-results-container">
+          <!-- Custom Query Response Banner (if custom input was provided with template) -->
+          <div class="custom-response-card" id="custom-response-card" style="display:none; margin-bottom: 20px; background: rgba(1, 51, 40, 0.05); border: 1.5px solid var(--color-forest-green); border-radius: 12px; padding: 16px 20px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <span style="font-size:16px;">💬</span>
+              <strong style="color:var(--color-forest-green); font-size:12.5px; text-transform:uppercase; letter-spacing:0.04em;">Answer to Custom Inquiry</strong>
+            </div>
+            <div id="custom-response-text" style="font-size:13.5px; color:var(--color-espresso); line-height:1.55;"></div>
+          </div>
+
+          <!-- Executive Narrative Summary -->
+          <div class="narrative-card" id="executive-summary-block">
+            <!-- Populated from analysis.executive_summary -->
+          </div>
+
+          <!-- KPI Metrics Cards Deck -->
+          <div class="metrics-deck" id="metrics-deck">
+            <!-- Populated from analysis.key_metrics -->
+          </div>
+
+          <!-- Structured Line-Level & Reconciliation Breakdown Table -->
+          <div class="breakdown-card" id="breakdown-table-container" style="display:none;">
+            <div class="breakdown-card-header">
+              <div class="breakdown-card-title">
+                <span id="breakdown-table-title">📊 Structured Analysis Breakdown</span>
+                <span class="table-row-count-pill" id="breakdown-count-pill">0 items</span>
+              </div>
+            </div>
+            <div class="breakdown-table-wrapper">
+              <table class="breakdown-data-table">
+                <thead id="breakdown-table-head"></thead>
+                <tbody id="breakdown-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Findings & Recommendations Twin Grid -->
+          <div class="insights-deck">
+            <!-- Findings Column -->
+            <div class="insight-subcard">
+              <div class="insight-subcard-title">
+                <span>🔍 Key Findings & Risk Items</span>
+                <span id="findings-count-pill" style="font-size:11px; color:var(--color-espresso-muted);">0</span>
+              </div>
+              <div class="finding-pill-row" id="findings-list">
+                <!-- Populated from analysis.findings -->
+              </div>
+            </div>
+
+            <!-- Recommendations Column -->
+            <div class="insight-subcard">
+              <div class="insight-subcard-title">
+                <span>🎯 Actionable Recommendations</span>
+                <span id="recs-count-pill" style="font-size:11px; color:var(--color-espresso-muted);">0</span>
+              </div>
+              <div class="finding-pill-row" id="recommendations-list">
+                <!-- Populated from analysis.recommendations -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Supplementary Audit Notes -->
+          <div id="supplementary-notes-container" style="display:none; font-size:12px; color:var(--color-espresso-muted); background:#FFFFFF; border:var(--border-light); padding:12px 16px; border-radius:var(--radius-sm);">
+            <strong>📝 Supplementary Audit Notes:</strong> <span id="supplementary-notes-text"></span>
+          </div>
         </div>
+
 
         <!-- SQL Result Sets Multi-Table Viewer -->
         <div class="sql-tables-card" id="sql-tables-section">

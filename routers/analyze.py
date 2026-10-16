@@ -81,12 +81,15 @@ def run_analysis(request: AnalyzeRequest) -> AnalyzeResponse:
             detail=f"Tool with id '{request.toolId}' not found in tools.json."
         )
 
-    prompt_match = next((p for p in tool_match.get("prompts", []) if p["id"] == request.promptId), None)
-    if not prompt_match:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Prompt with id '{request.promptId}' not found for tool '{request.toolId}'."
-        )
+    is_custom_prompt = (request.promptId == "custom")
+    prompt_match = None
+    if not is_custom_prompt:
+        prompt_match = next((p for p in tool_match.get("prompts", []) if p["id"] == request.promptId), None)
+        if not prompt_match:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Prompt with id '{request.promptId}' not found for tool '{request.toolId}'."
+            )
 
     # 2. Build the parameterized SP query with user arguments
     try:
@@ -146,51 +149,98 @@ def run_analysis(request: AnalyzeRequest) -> AnalyzeResponse:
         "table_count": len(raw_tables)
     }
 
-    # 5. Use the selected prompt strictly for AI analysis
-    system_prompt = prompt_match.get("systemPrompt", "You are an expert enterprise data analyst.")
-    user_prompt_template = prompt_match.get("userPromptTemplate", "Analyze the following data:\n\n{{data}}")
+    # 5. Execute Gemini Analysis (Structured Schema for templates, Free-form Markdown for custom prompt)
+    analysis_result = None
+    raw_analysis_text = None
+    ai_latency_ms = 0
 
-    try:
-        analysis_result, ai_latency_ms = gemini_client.analyze_data(
-            tables=raw_tables,
-            system_prompt=system_prompt,
-            user_prompt_template=user_prompt_template,
-            sp_metadata=sp_metadata
-        )
-    except Exception as e:
-        # Return SQL tables even if AI call fails, so user can inspect raw data
-        tables_result = [
-            TableResult(
-                table_index=t["table_index"],
-                name=t["name"],
-                columns=t["columns"],
-                row_count=t["row_count"],
-                rows=t["rows"]
+    if is_custom_prompt:
+        custom_query = (request.custom_input or "").strip()
+        if not custom_query:
+            custom_query = "Provide a comprehensive analytical summary and key observations from the returned stored procedure data."
+        try:
+            raw_analysis_text, ai_latency_ms = gemini_client.analyze_custom_data(
+                tables=raw_tables,
+                custom_prompt=custom_query,
+                sp_metadata=sp_metadata
             )
-            for t in raw_tables
-        ]
-        total_time_ms = int((time.time() - total_start) * 1000)
-        return AnalyzeResponse(
-            success=False,
-            tables=tables_result,
-            error="AI reasoning generation failed",
-            detail=str(e),
-            metadata=ExecutionMetadata(
-                tool_id=request.toolId,
-                prompt_id=request.promptId,
-                sp_executed=sp_name,
-                sql_execution_time_ms=sql_execution_ms,
-                ai_latency_ms=0,
-                total_execution_time_ms=total_time_ms,
-                table_count=len(raw_tables),
-                total_rows=total_rows,
-                model_used=gemini_client.default_model
+            print("--------------")
+            print(raw_analysis_text)
+            print("--------------")
+        except Exception as e:
+            tables_result = [
+                TableResult(
+                    table_index=t["table_index"],
+                    name=t["name"],
+                    columns=t["columns"],
+                    row_count=t["row_count"],
+                    rows=t["rows"]
+                )
+                for t in raw_tables
+            ]
+            total_time_ms = int((time.time() - total_start) * 1000)
+            return AnalyzeResponse(
+                success=False,
+                tables=tables_result,
+                error="AI reasoning generation failed",
+                detail=str(e),
+                metadata=ExecutionMetadata(
+                    tool_id=request.toolId,
+                    prompt_id=request.promptId,
+                    sp_executed=sp_name,
+                    sql_execution_time_ms=sql_execution_ms,
+                    ai_latency_ms=0,
+                    total_execution_time_ms=total_time_ms,
+                    table_count=len(raw_tables),
+                    total_rows=total_rows,
+                    model_used=gemini_client.default_model
+                )
             )
-        )
+    else:
+        system_prompt = prompt_match.get("systemPrompt", "You are an expert enterprise data analyst.")
+        user_prompt_template = prompt_match.get("userPromptTemplate", "Analyze the following data:\n\n{{data}}")
+
+        try:
+            analysis_result, ai_latency_ms = gemini_client.analyze_data(
+                tables=raw_tables,
+                system_prompt=system_prompt,
+                user_prompt_template=user_prompt_template,
+                sp_metadata=sp_metadata,
+                custom_input=request.custom_input
+            )
+        except Exception as e:
+            tables_result = [
+                TableResult(
+                    table_index=t["table_index"],
+                    name=t["name"],
+                    columns=t["columns"],
+                    row_count=t["row_count"],
+                    rows=t["rows"]
+                )
+                for t in raw_tables
+            ]
+            total_time_ms = int((time.time() - total_start) * 1000)
+            return AnalyzeResponse(
+                success=False,
+                tables=tables_result,
+                error="AI reasoning generation failed",
+                detail=str(e),
+                metadata=ExecutionMetadata(
+                    tool_id=request.toolId,
+                    prompt_id=request.promptId,
+                    sp_executed=sp_name,
+                    sql_execution_time_ms=sql_execution_ms,
+                    ai_latency_ms=0,
+                    total_execution_time_ms=total_time_ms,
+                    table_count=len(raw_tables),
+                    total_rows=total_rows,
+                    model_used=gemini_client.default_model
+                )
+            )
 
     total_time_ms = int((time.time() - total_start) * 1000)
 
-    # 6. Return both raw SQL tables and structured AI analysis
+    # 6. Return raw SQL tables along with either structured analysis or raw analysis
     tables_result = [
         TableResult(
             table_index=t["table_index"],
@@ -217,6 +267,7 @@ def run_analysis(request: AnalyzeRequest) -> AnalyzeResponse:
     return AnalyzeResponse(
         success=True,
         analysis=analysis_result,
+        raw_analysis=raw_analysis_text,
         tables=tables_result,
         metadata=metadata_result
     )

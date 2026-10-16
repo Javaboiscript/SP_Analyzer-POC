@@ -31,6 +31,11 @@ class AnalyzeRequest(BaseModel):
             }
         }
     )
+    custom_input: Optional[str] = Field(
+        None,
+        description="Optional custom query, notes, or specific analytical focus instructions from the user",
+        json_schema_extra={"example": "Focus on reasons for item rejection or payment clearance status"}
+    )
 
 
 # ---------------------------------------------------------
@@ -55,14 +60,29 @@ class Recommendation(BaseModel):
     priority: str = Field(..., description="Urgency of the action: 'high', 'medium', or 'low'")
 
 
+class AnalysisBreakdownRow(BaseModel):
+    item_or_category: str = Field(..., description="Item name/description, document ID, or line reference (e.g. '1 LTR CANE EN8D' or 'GRN #1817')")
+    col1_label: str = Field(..., description="Short header label for metric 1 (e.g. 'Ordered Qty', 'Min Schedule Date', 'Challan Qty', 'PO Value')")
+    col1_value: str = Field(..., description="Value for metric 1 (e.g. '12,000 NOS', '2022-12-10', '₹6,00,000')")
+    col2_label: str = Field(..., description="Short header label for metric 2 (e.g. 'Received Qty', 'Receipt Date', 'Accepted Qty', 'GRN Accepted')")
+    col2_value: str = Field(..., description="Value for metric 2 (e.g. '12,000 NOS', '2022-11-01', '₹6,00,000')")
+    col3_label: str = Field(..., description="Short header label for metric 3 (e.g. 'Balance Qty', 'Delay Days', 'Rejected Qty', 'Billed Amount')")
+    col3_value: str = Field(..., description="Value for metric 3 (e.g. '0 NOS', '0 Days', '₹0')")
+    status_tag: Optional[str] = Field(None, description="Concise status or flag: 'COMPLETED', 'OVERDUE', 'PENDING_BILLING', 'REJECTED', 'MATCHED', 'ON_TIME', etc.")
+
+
 class AIAnalysisResult(BaseModel):
     executive_summary: str = Field(
         ...,
-        description="High-level narrative briefing covering the key insights and conclusions"
+        description="Concise executive briefing in 2 to 3 structured highlight points. Focus on business impact so executives don't need to read walls of text."
     )
     key_metrics: List[KeyMetric] = Field(
         default_factory=list,
-        description="Key numerical figures and calculated KPIs extracted from the data"
+        description="Top 3 to 5 key numerical figures and calculated KPIs extracted from the data"
+    )
+    breakdown_table: List[AnalysisBreakdownRow] = Field(
+        default_factory=list,
+        description="Structured line-level or comparative breakdown matrix tailored to the selected prompt template."
     )
     findings: List[Finding] = Field(
         default_factory=list,
@@ -75,6 +95,10 @@ class AIAnalysisResult(BaseModel):
     additional_notes: Optional[str] = Field(
         None,
         description="Optional supplementary notes, audit disclaimers, or data limitation observations"
+    )
+    custom_response: Optional[str] = Field(
+        None,
+        description="Direct answer or targeted analytical assessment addressing the user's custom inquiries or instructions if provided."
     )
 
 
@@ -109,6 +133,10 @@ class ExecutionMetadata(BaseModel):
 class AnalyzeResponse(BaseModel):
     success: bool
     analysis: Optional[AIAnalysisResult] = None
+    raw_analysis: Optional[str] = Field(
+        None,
+        description="Raw, unstructured Markdown response from Gemini when a custom prompt is executed without schema enforcement."
+    )
     tables: Optional[List[TableResult]] = None
     metadata: Optional[ExecutionMetadata] = None
     error: Optional[str] = None

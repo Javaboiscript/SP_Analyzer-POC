@@ -10,6 +10,7 @@ const state = {
   selectedTool: null,
   selectedPrompt: null,
   currentAnalysis: null,
+  currentRawAnalysis: null,
   currentTables: [],
   activeTableIndex: 0,
   tableFilterQuery: "",
@@ -101,6 +102,18 @@ const el = {
   recommendationsList: document.getElementById("recommendations-list"),
   supplementaryNotesContainer: document.getElementById("supplementary-notes-container"),
   supplementaryNotesText: document.getElementById("supplementary-notes-text"),
+  customResponseCard: document.getElementById("custom-response-card"),
+  customResponseText: document.getElementById("custom-response-text"),
+  rawAnalysisContainer: document.getElementById("raw-analysis-container"),
+  rawAnalysisContent: document.getElementById("raw-analysis-content"),
+  structuredResultsContainer: document.getElementById("structured-results-container"),
+  
+  // Breakdown Table
+  breakdownTableContainer: document.getElementById("breakdown-table-container"),
+  breakdownTableTitle: document.getElementById("breakdown-table-title"),
+  breakdownCountPill: document.getElementById("breakdown-count-pill"),
+  breakdownTableHead: document.getElementById("breakdown-table-head"),
+  breakdownTableBody: document.getElementById("breakdown-table-body"),
   
   // SQL Tables
   sqlTablesSection: document.getElementById("sql-tables-section"),
@@ -388,19 +401,18 @@ function renderParametersForm(tool) {
 function renderPromptsList(tool) {
   el.promptsListContainer.innerHTML = "";
   const prompts = tool.prompts || [];
-  el.promptsCountBadge.textContent = `${prompts.length} Prompts`;
+  el.promptsCountBadge.textContent = `${prompts.length + 1} Options`;
 
-  if (prompts.length === 0) {
-    el.promptsListContainer.innerHTML = `<p style="font-size:12px; color:var(--color-espresso-muted);">No prompts configured for this tool.</p>`;
-    state.selectedPrompt = null;
-    el.actionPromptName.textContent = "No prompt available";
-    return;
+  // Default to first prompt template
+  if (prompts.length > 0) {
+    state.selectedPrompt = prompts[0];
+    el.actionPromptName.textContent = prompts[0].label;
+  } else {
+    state.selectedPrompt = { id: "custom", label: "Custom Free-form Analysis", isCustom: true };
+    el.actionPromptName.textContent = "Custom Free-form Analysis";
   }
 
-  // Default to first prompt
-  state.selectedPrompt = prompts[0];
-  el.actionPromptName.textContent = prompts[0].label;
-
+  // 1. Render predefined prompt cards
   prompts.forEach((p, idx) => {
     const card = document.createElement("div");
     card.className = `prompt-select-card ${idx === 0 ? "selected" : ""}`;
@@ -418,10 +430,60 @@ function renderPromptsList(tool) {
       document.querySelectorAll(".prompt-select-card").forEach(c => c.classList.remove("selected"));
       card.classList.add("selected");
       el.actionPromptName.textContent = p.label;
+
+      // Collapse custom prompt input when a standard template is selected
+      const customWrapper = document.getElementById("custom-prompt-wrapper");
+      if (customWrapper) customWrapper.style.display = "none";
     });
 
     el.promptsListContainer.appendChild(card);
   });
+
+  // 2. Render Custom Free-form Analysis prompt card (treated as a prompt lens option)
+  const customCard = document.createElement("div");
+  customCard.className = `prompt-select-card custom-prompt-card ${prompts.length === 0 ? "selected" : ""}`;
+  customCard.id = "prompt-card-custom";
+  customCard.innerHTML = `
+    <div class="prompt-radio-dot"></div>
+    <div class="prompt-card-details" style="width: 100%;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+        <h4 style="margin: 0;">✍️ Custom Free-form Analysis</h4>
+        <span style="font-size: 9px; font-weight: 700; background: rgba(204, 139, 101, 0.18); color: var(--color-terracotta-dark); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Unconstrained</span>
+      </div>
+      <p style="margin-bottom: 4px;">Define your own analysis prompt without rigid JSON schema constraints. The LLM responds in free-form Markdown.</p>
+      <div class="custom-prompt-input-wrapper" id="custom-prompt-wrapper" style="display: none; margin-top: 8px;">
+        <textarea
+          id="custom-prompt-textarea"
+          class="minimal-input"
+          rows="3"
+          placeholder="e.g. Focus on vendor delivery turnaround, list all late line items with delay days, and give immediate recommendations..."
+          style="width: 100%; resize: vertical; font-size: 12px; line-height: 1.45; padding: 8px 10px; background: #FFFFFF;"
+        ></textarea>
+        <div style="font-size: 10.5px; color: var(--color-espresso-faint); margin-top: 4px;">
+          Direct LLM response will be displayed without enforcing predefined schemas.
+        </div>
+      </div>
+    </div>
+  `;
+
+  customCard.addEventListener("click", (e) => {
+    // If the click originated inside the textarea, do not deselect
+    if (e.target.id === "custom-prompt-textarea") return;
+
+    state.selectedPrompt = { id: "custom", label: "Custom Free-form Analysis", isCustom: true };
+    document.querySelectorAll(".prompt-select-card").forEach(c => c.classList.remove("selected"));
+    customCard.classList.add("selected");
+    el.actionPromptName.textContent = "Custom Free-form Analysis";
+
+    const customWrapper = document.getElementById("custom-prompt-wrapper");
+    if (customWrapper) {
+      customWrapper.style.display = "block";
+      const textarea = document.getElementById("custom-prompt-textarea");
+      if (textarea) textarea.focus();
+    }
+  });
+
+  el.promptsListContainer.appendChild(customCard);
 }
 
 /**
@@ -435,6 +497,10 @@ function resetParameters() {
       input.value = "";
     }
   });
+  const customTextarea = document.getElementById("custom-prompt-textarea");
+  if (customTextarea) {
+    customTextarea.value = "";
+  }
 }
 
 function collectParameters() {
@@ -473,10 +539,33 @@ async function runAnalysis() {
 
   el.loadingBox.scrollIntoView({ behavior: "smooth", block: "center" });
 
+  const isCustom = state.selectedPrompt.id === "custom";
+  let customInputVal = null;
+
+  if (isCustom) {
+    const customTextarea = document.getElementById("custom-prompt-textarea");
+    customInputVal = customTextarea ? customTextarea.value.trim() : "";
+    if (!customInputVal) {
+      el.loadingBox.classList.remove("active");
+      el.btnRunAnalysis.disabled = false;
+      showError(
+        "Custom Prompt Required",
+        "Please enter your analytical question or instructions in the Custom Free-form Analysis box."
+      );
+      const customWrapper = document.getElementById("custom-prompt-wrapper");
+      if (customWrapper) {
+        customWrapper.style.display = "block";
+        if (customTextarea) customTextarea.focus();
+      }
+      return;
+    }
+  }
+
   const payload = {
     toolId: state.selectedTool.id,
-    promptId: state.selectedPrompt.id,
-    params: collectParameters()
+    promptId: isCustom ? "custom" : state.selectedPrompt.id,
+    params: collectParameters(),
+    custom_input: isCustom ? customInputVal : null
   };
 
   try {
@@ -516,6 +605,7 @@ async function runAnalysis() {
  */
 function renderResults(data) {
   state.currentAnalysis = data.analysis;
+  state.currentRawAnalysis = data.raw_analysis || null;
   state.currentTables = data.tables || [];
 
   const meta = data.metadata || {};
@@ -524,28 +614,52 @@ function renderResults(data) {
   el.statTotalRows.textContent = `${meta.total_rows || 0}`;
   el.statTableCount.textContent = `${meta.table_count || state.currentTables.length}`;
 
-  // Executive Narrative
-  if (data.analysis && data.analysis.executive_summary) {
-    el.executiveSummaryBlock.innerHTML = formatParagraphs(data.analysis.executive_summary);
+  // If this was a custom unconstrained prompt, render raw analysis directly
+  if (data.raw_analysis) {
+    if (el.structuredResultsContainer) el.structuredResultsContainer.style.display = "none";
+    if (el.rawAnalysisContainer) {
+      el.rawAnalysisContainer.style.display = "block";
+      el.rawAnalysisContent.innerHTML = renderMarkdown(data.raw_analysis);
+    }
   } else {
-    el.executiveSummaryBlock.innerHTML = "<em>No executive narrative summary generated.</em>";
-  }
+    // Structured analysis mode
+    if (el.rawAnalysisContainer) el.rawAnalysisContainer.style.display = "none";
+    if (el.structuredResultsContainer) el.structuredResultsContainer.style.display = "block";
 
-  // KPI Metrics
-  renderKeyMetrics(data.analysis ? data.analysis.key_metrics || [] : []);
+    // Custom Inquiry Response (if answered)
+    if (data.analysis && data.analysis.custom_response && data.analysis.custom_response.trim()) {
+      el.customResponseText.innerHTML = formatParagraphs(data.analysis.custom_response);
+      el.customResponseCard.style.display = "block";
+    } else {
+      el.customResponseCard.style.display = "none";
+    }
 
-  // Findings
-  renderFindings(data.analysis ? data.analysis.findings || [] : []);
+    // Executive Narrative
+    if (data.analysis && data.analysis.executive_summary) {
+      el.executiveSummaryBlock.innerHTML = formatParagraphs(data.analysis.executive_summary);
+    } else {
+      el.executiveSummaryBlock.innerHTML = "<em>No executive narrative summary generated.</em>";
+    }
 
-  // Recommendations
-  renderRecommendations(data.analysis ? data.analysis.recommendations || [] : []);
+    // KPI Metrics
+    renderKeyMetrics(data.analysis ? data.analysis.key_metrics || [] : []);
 
-  // Supplementary Notes
-  if (data.analysis && data.analysis.additional_notes) {
-    el.supplementaryNotesText.textContent = data.analysis.additional_notes;
-    el.supplementaryNotesContainer.style.display = "block";
-  } else {
-    el.supplementaryNotesContainer.style.display = "none";
+    // Structured Breakdown Matrix (Line-Level, Delays, Quality, or 3-Way Match)
+    renderBreakdownTable(data.analysis ? data.analysis.breakdown_table || [] : []);
+
+    // Findings
+    renderFindings(data.analysis ? data.analysis.findings || [] : []);
+
+    // Recommendations
+    renderRecommendations(data.analysis ? data.analysis.recommendations || [] : []);
+
+    // Supplementary Notes
+    if (data.analysis && data.analysis.additional_notes) {
+      el.supplementaryNotesText.textContent = data.analysis.additional_notes;
+      el.supplementaryNotesContainer.style.display = "block";
+    } else {
+      el.supplementaryNotesContainer.style.display = "none";
+    }
   }
 
   // SQL Result Tables
@@ -574,11 +688,80 @@ function renderKeyMetrics(metrics) {
     const card = document.createElement("div");
     card.className = `metric-pill-card ${theme}`;
     card.innerHTML = `
-      <div class="metric-pill-label">${m.label}</div>
-      <div class="metric-pill-val">${m.value}</div>
-      ${m.trend ? `<div class="metric-pill-trend">${m.trend}</div>` : ""}
+      <div class="metric-pill-label">${escapeHtml(m.label)}</div>
+      <div class="metric-pill-val">${escapeHtml(m.value)}</div>
+      ${m.trend ? `<div class="metric-pill-trend">${escapeHtml(m.trend)}</div>` : ""}
     `;
     el.metricsDeck.appendChild(card);
+  });
+}
+
+/**
+ * Render Structured Breakdown Table
+ */
+function renderBreakdownTable(breakdownRows) {
+  if (!breakdownRows || breakdownRows.length === 0) {
+    el.breakdownTableContainer.style.display = "none";
+    return;
+  }
+
+  el.breakdownTableContainer.style.display = "block";
+  el.breakdownCountPill.textContent = `${breakdownRows.length} item${breakdownRows.length === 1 ? '' : 's'}`;
+
+  // Dynamic titles depending on selected prompt
+  const pId = state.selectedPrompt ? state.selectedPrompt.id : "";
+  if (pId === "three_way_matching_finance") {
+    el.breakdownTableTitle.textContent = "⚖️ Three-Way Match & Financial Valuation Matrix";
+  } else if (pId === "vendor_delivery_performance") {
+    el.breakdownTableTitle.textContent = "⏱️ Supplier Delivery Schedule & Delay Matrix";
+  } else if (pId === "quality_rejection_audit") {
+    el.breakdownTableTitle.textContent = "🔍 Material Inspection & Rejection Variance Matrix";
+  } else {
+    el.breakdownTableTitle.textContent = "📋 Line-Level Health & Quantity Fulfillment Matrix";
+  }
+
+  // Determine dynamic column headers from the first row
+  const first = breakdownRows[0];
+  const h1 = first.col1_label || "Metric 1";
+  const h2 = first.col2_label || "Metric 2";
+  const h3 = first.col3_label || "Metric 3";
+
+  el.breakdownTableHead.innerHTML = `
+    <tr>
+      <th style="min-width: 170px;">Item / Scope</th>
+      <th>${escapeHtml(h1)}</th>
+      <th>${escapeHtml(h2)}</th>
+      <th>${escapeHtml(h3)}</th>
+      <th style="text-align: right; min-width: 110px;">Status / Flag</th>
+    </tr>
+  `;
+
+  el.breakdownTableBody.innerHTML = "";
+  breakdownRows.forEach(r => {
+    const tr = document.createElement("tr");
+    const tag = (r.status_tag || "").toUpperCase();
+
+    let tagClass = "tag-info";
+    if (["COMPLETED", "MATCHED", "ON_TIME", "ACCEPTED", "FULLY_RECEIVED"].some(s => tag.includes(s))) {
+      tagClass = "tag-success";
+    } else if (["PENDING", "PENDING_BILLING", "WAITING", "UNBILLED", "PARTIAL"].some(s => tag.includes(s))) {
+      tagClass = "tag-warning";
+    } else if (["OVERDUE", "REJECTED", "CANCELLED", "REJECTION", "EXPIRED", "DELAYED"].some(s => tag.includes(s))) {
+      tagClass = "tag-danger";
+    }
+
+    tr.innerHTML = `
+      <td class="breakdown-item-cell">
+        <strong>${escapeHtml(r.item_or_category || "—")}</strong>
+      </td>
+      <td>${escapeHtml(r.col1_value || "—")}</td>
+      <td>${escapeHtml(r.col2_value || "—")}</td>
+      <td>${escapeHtml(r.col3_value || "—")}</td>
+      <td style="text-align: right;">
+        ${tag ? `<span class="breakdown-status-badge ${tagClass}">${escapeHtml(tag)}</span>` : "—"}
+      </td>
+    `;
+    el.breakdownTableBody.appendChild(tr);
   });
 }
 
@@ -742,10 +925,21 @@ function exportActiveTableAsCsv() {
  * Copy Report
  */
 function copyAiReport() {
+  if (state.currentRawAnalysis) {
+    navigator.clipboard.writeText(state.currentRawAnalysis).then(() => {
+      el.btnCopyReport.textContent = "✓ Copied!";
+      setTimeout(() => { el.btnCopyReport.textContent = "📋 Copy Briefing"; }, 2000);
+    });
+    return;
+  }
+
   if (!state.currentAnalysis) return;
   const a = state.currentAnalysis;
 
   let md = `# EXECUTIVE ANALYSIS REPORT\n\n`;
+  if (a.custom_response) {
+    md += `## Custom Inquiry Answer\n${a.custom_response}\n\n`;
+  }
   md += `## Executive Summary\n${a.executive_summary}\n\n`;
 
   if (a.key_metrics && a.key_metrics.length > 0) {
@@ -831,3 +1025,105 @@ function formatParagraphs(text) {
   if (!text) return "";
   return text.split("\n\n").map(p => `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`).join("");
 }
+
+/**
+ * Lightweight, safe Markdown-to-HTML parser for unconstrained LLM responses.
+ */
+function renderMarkdown(md) {
+  if (!md) return "";
+
+  // 1. Normalize line endings
+  let text = md.replace(/\r\n/g, "\n");
+
+  // 2. Extract code blocks to preserve them
+  const codeBlocks = [];
+  text = text.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    const idx = codeBlocks.length;
+    codeBlocks.push(`<pre><code class="language-${escapeHtml(lang)}">${escapeHtml(code.trim())}</code></pre>`);
+    return `\n\n@@CODEBLOCK_${idx}@@\n\n`;
+  });
+
+  // Helper for inline styles
+  function inlineMarkdown(str) {
+    return escapeHtml(str)
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>');
+  }
+
+  // 3. Extract tables
+  const tableRegex = /((?:^|\n)\|[^\n]+\|\n\|[\s:-|-]+\|\n(?:\|[^\n]+\|\n?)+)/g;
+  text = text.replace(tableRegex, (match) => {
+    const lines = match.trim().split("\n");
+    if (lines.length < 2) return match;
+    const headerCells = lines[0].split("|").filter((_, i, arr) => i > 0 && i < arr.length - 1).map(c => c.trim());
+    const bodyRows = lines.slice(2).map(line => {
+      return line.split("|").filter((_, i, arr) => i > 0 && i < arr.length - 1).map(c => c.trim());
+    });
+
+    let html = '<table><thead><tr>';
+    headerCells.forEach(h => { html += `<th>${escapeHtml(h)}</th>`; });
+    html += '</tr></thead><tbody>';
+    bodyRows.forEach(row => {
+      html += '<tr>';
+      row.forEach(cell => { html += `<td>${inlineMarkdown(cell)}</td>`; });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    return `\n\n${html}\n\n`;
+  });
+
+  // 4. Split into paragraphs / blocks
+  const blocks = text.split(/\n{2,}/);
+  const parsedBlocks = blocks.map(block => {
+    block = block.trim();
+    if (!block) return "";
+
+    if (block.startsWith("@@CODEBLOCK_")) {
+      const idxMatch = block.match(/@@CODEBLOCK_(\d+)@@/);
+      if (idxMatch) {
+        return codeBlocks[parseInt(idxMatch[1], 10)];
+      }
+    }
+
+    if (block.startsWith("<table")) {
+      return block;
+    }
+
+    // Headings
+    if (block.startsWith("#### ")) return `<h4>${inlineMarkdown(block.slice(5))}</h4>`;
+    if (block.startsWith("### ")) return `<h3>${inlineMarkdown(block.slice(4))}</h3>`;
+    if (block.startsWith("## ")) return `<h2>${inlineMarkdown(block.slice(3))}</h2>`;
+    if (block.startsWith("# ")) return `<h1>${inlineMarkdown(block.slice(2))}</h1>`;
+
+    // Blockquote
+    if (block.startsWith("> ")) {
+      const content = block.split("\n").map(l => l.replace(/^>\s?/, "")).join("<br>");
+      return `<blockquote>${inlineMarkdown(content)}</blockquote>`;
+    }
+
+    // Unordered List
+    if (/^[-*]\s+/m.test(block)) {
+      const items = block.split("\n").filter(l => l.trim());
+      const lis = items.map(l => `<li>${inlineMarkdown(l.replace(/^[-*]\s+/, ""))}</li>`).join("");
+      return `<ul>${lis}</ul>`;
+    }
+
+    // Ordered List
+    if (/^\d+\.\s+/m.test(block)) {
+      const items = block.split("\n").filter(l => l.trim());
+      const lis = items.map(l => `<li>${inlineMarkdown(l.replace(/^\d+\.\s+/, ""))}</li>`).join("");
+      return `<ol>${lis}</ol>`;
+    }
+
+    // Normal paragraph
+    return `<p>${inlineMarkdown(block).replace(/\n/g, "<br>")}</p>`;
+  });
+
+  let finalHtml = parsedBlocks.join("");
+
+  // Restore any placeholder that might remain
+  finalHtml = finalHtml.replace(/@@CODEBLOCK_(\d+)@@/g, (_, idx) => codeBlocks[parseInt(idx, 10)] || "");
+  return finalHtml;
+}
+

@@ -115,6 +115,7 @@ class GeminiClient:
         system_prompt: str,
         user_prompt_template: str,
         sp_metadata: Dict[str, Any],
+        custom_input: str = None,
         model: str = None
     ) -> Tuple[AIAnalysisResult, int]:
         """
@@ -141,6 +142,14 @@ class GeminiClient:
         else:
             final_user_content = f"{user_prompt_template}\n\n--- DATA ---\n{formatted_data}\n{metadata_context}"
 
+        # Append user custom instructions / questions if provided
+        if custom_input and custom_input.strip():
+            final_user_content += (
+                f"\n\n--- USER CUSTOM INQUIRIES & DIRECTIVES ---\n"
+                f"{custom_input.strip()}\n\n"
+                f"[Guidance for User Inquiry]: Directly address the user's custom question or directives above, and populate the 'custom_response' field in your structured JSON output with a clear, concise answer."
+            )
+
         # Call Gemini using google-genai SDK
         response = self.client.models.generate_content(
             model=chosen_model,
@@ -162,6 +171,57 @@ class GeminiClient:
             analysis_result = AIAnalysisResult.model_validate_json(response.text)
 
         return analysis_result, ai_latency_ms
+
+    def analyze_custom_data(
+        self,
+        tables: List[Dict[str, Any]],
+        custom_prompt: str,
+        sp_metadata: Dict[str, Any],
+        system_prompt: str = None,
+        model: str = None
+    ) -> Tuple[str, int]:
+        """
+        Assembles prompt with formatted tabular data and invokes Gemini in free-form (unconstrained) mode.
+        No Pydantic schema is enforced; Gemini generates natural language / Markdown directly.
+
+        Returns:
+            Tuple[raw_text_response, ai_latency_ms]
+        """
+        chosen_model = model or self.default_model
+        start_time = time.time()
+
+        # Format tabular data
+        formatted_data = self.format_tables_for_prompt(tables)
+
+        # Build context notes from metadata
+        metadata_context = (
+            f"\n[Execution Metadata]: Stored Procedure '{sp_metadata.get('sp_executed')}' "
+            f"returned {sp_metadata.get('table_count', 1)} table(s) with {sp_metadata.get('total_rows', 0)} total row(s)."
+        )
+
+        sys_prompt = system_prompt or (
+            "You are an expert enterprise data analyst and business intelligence specialist. "
+            "Analyze the provided stored procedure tabular data and answer the user's instructions "
+            "directly, comprehensively, and clearly using clean Markdown."
+        )
+
+        if "{{data}}" in custom_prompt:
+            final_user_content = custom_prompt.replace("{{data}}", formatted_data + metadata_context)
+        else:
+            final_user_content = f"{custom_prompt}\n\n--- STORED PROCEDURE DATA ---\n{formatted_data}\n{metadata_context}"
+
+        # Call Gemini in free-form mode (no response_schema, no JSON enforcement)
+        response = self.client.models.generate_content(
+            model=chosen_model,
+            contents=final_user_content,
+            config=types.GenerateContentConfig(
+                system_instruction=sys_prompt,
+                temperature=0.2,
+            )
+        )
+
+        ai_latency_ms = int((time.time() - start_time) * 1000)
+        return response.text or "", ai_latency_ms
 
 
 # Global singleton instance
