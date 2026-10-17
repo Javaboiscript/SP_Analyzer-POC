@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SP Analyzer // AI Stored Procedure Reasoning Studio</title>
   <meta name="description" content="AI-Powered Stored Procedure Analyzer & Enterprise Reasoning Studio with Google Gemini and SQL Server.">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=1.2">
 </head>
 <body>
 
@@ -87,6 +87,14 @@
         </button>
       </div>
 
+      <!-- Sub-Report Switcher (shown when tool has multiple reports e.g. Report Analyzer) -->
+      <div class="report-selector-bar" id="report-selector-bar" style="display:none;">
+        <span class="report-selector-label">📊 Select Report to Analyze:</span>
+        <div class="report-selector-tabs" id="report-selector-tabs">
+          <!-- Dynamically populated report buttons -->
+        </div>
+      </div>
+
       <!-- 2-Column Setup Grid: Parameters Form Left, Prompts Right -->
       <div class="workspace-grid">
 
@@ -94,7 +102,7 @@
         <div class="workspace-card">
           <div class="workspace-card-head">
             <div class="workspace-card-title">
-              <span>01 // Input Parameters</span>
+              <span id="params-column-title">01 // Input Parameters</span>
             </div>
             <button type="button" id="btn-reset-params" style="background:none; border:none; color:var(--color-terracotta-dark); font-size:11px; font-weight:700; cursor:pointer;">
               ↺ Reset
@@ -117,21 +125,20 @@
               </div>
             </form>
 
-
           </div>
         </div>
 
-        <!-- RIGHT COLUMN: Prompts List -->
+        <!-- RIGHT COLUMN: Prompts List / Custom Lens -->
         <div class="workspace-card">
           <div class="workspace-card-head">
             <div class="workspace-card-title">
-              <span>02 // Analytical Prompt Lens</span>
+              <span id="prompts-column-title">02 // Analytical Prompt Lens</span>
             </div>
             <span id="prompts-count-badge" style="font-size:11px; color:var(--color-espresso-muted); font-weight:600;">6 Prompts</span>
           </div>
 
           <div class="workspace-card-body">
-            <p style="font-size:12.5px; color:var(--color-espresso-muted);">
+            <p id="prompts-column-desc" style="font-size:12.5px; color:var(--color-espresso-muted);">
               Select the analytical focus for Gemini to reason over the returned stored procedure data:
             </p>
             <div class="prompts-list" id="prompts-list-container">
@@ -141,6 +148,7 @@
         </div>
 
       </div>
+
 
       <!-- Action Bar -->
       <div class="workspace-action-bar">
@@ -186,8 +194,14 @@
           </div>
 
           <div class="results-actions-right">
+            <div class="toggle-pill-segmented" id="tables-toggle-group" title="Toggle raw SQL tables display">
+              <span class="toggle-pill-label">Tables</span>
+              <div class="toggle-pill-switch">
+                <button type="button" class="toggle-switch-btn active" id="btn-tables-off" title="Hide raw SQL tables">OFF</button>
+                <button type="button" class="toggle-switch-btn" id="btn-tables-on" title="Show raw SQL tables">ON</button>
+              </div>
+            </div>
             <button type="button" class="btn-action-sm" id="btn-copy-report">📋 Copy Briefing</button>
-            <button type="button" class="btn-action-sm" id="btn-scroll-sql">▼ Raw SQL Tables</button>
           </div>
         </div>
 
@@ -273,39 +287,56 @@
         </div>
 
 
-        <!-- SQL Result Sets Multi-Table Viewer -->
-        <div class="sql-tables-card" id="sql-tables-section">
+        <!-- SQL Result Sets Multi-Table Viewer (Hidden by default) -->
+        <div class="sql-tables-card" id="sql-tables-section" style="display:none;">
           <div class="sql-card-header">
             <div class="sql-card-title">
               <span>📊 Raw SQL Result Sets</span>
               <span class="table-row-count-pill" id="result-sets-badge">0 Tables</span>
             </div>
-            <button type="button" class="btn-action-sm" id="btn-export-csv" style="font-size:11px;">
-              ⬇ Export CSV
-            </button>
+            <div class="sql-header-actions" style="display:flex; align-items:center; gap:8px;">
+              <div class="table-view-toggle-pills" id="table-view-toggle">
+                <button type="button" class="btn-toggle-chip active" id="btn-view-all" title="Display all returned result tables stacked">📑 All Tables</button>
+                <button type="button" class="btn-toggle-chip" id="btn-view-single" title="Focus on one table at a time via tabs">🗂 Single Table</button>
+              </div>
+              <button type="button" class="btn-action-sm" id="btn-export-csv" style="font-size:11px;">
+                ⬇ Export CSV
+              </button>
+              <button type="button" class="btn-close-tables" id="btn-hide-tables-card" title="Hide raw SQL tables">
+                ✕ Hide
+              </button>
+            </div>
           </div>
 
-          <!-- Table Tabs -->
+          <!-- Table Tabs / Quick-Jump Bar -->
           <div class="table-pill-tabs" id="table-tabs-container">
-            <!-- Dynamically populated table tabs -->
+            <!-- Dynamically populated table tabs with jump or tab behavior -->
           </div>
 
-          <!-- Table Filter Toolbar -->
-          <div class="table-toolbar-pastel">
-            <input type="text" class="table-search-pastel" id="table-search-input" placeholder="🔍 Search records in this table...">
-            <span id="table-rows-info" style="font-size:11px; color:var(--color-espresso-muted); font-weight:600;">Showing 0 rows</span>
+          <!-- All Tables Stacked Container (Default) -->
+          <div id="all-tables-container" class="all-tables-container">
+            <!-- Dynamically populated cards for all tables -->
           </div>
 
-          <!-- Responsive Scrollable Data Table -->
-          <div class="table-responsive">
-            <table class="pastel-table" id="data-table">
-              <thead id="data-table-head">
-                <!-- Columns -->
-              </thead>
-              <tbody id="data-table-body">
-                <!-- Rows -->
-              </tbody>
-            </table>
+          <!-- Single Table Focused View (when toggled) -->
+          <div id="single-table-container" style="display:none;">
+            <!-- Table Filter Toolbar -->
+            <div class="table-toolbar-pastel">
+              <input type="text" class="table-search-pastel" id="table-search-input" placeholder="🔍 Search records in this table...">
+              <span id="table-rows-info" style="font-size:11px; color:var(--color-espresso-muted); font-weight:600;">Showing 0 rows</span>
+            </div>
+
+            <!-- Responsive Scrollable Data Table -->
+            <div class="table-responsive">
+              <table class="pastel-table" id="data-table">
+                <thead id="data-table-head">
+                  <!-- Columns -->
+                </thead>
+                <tbody id="data-table-body">
+                  <!-- Rows -->
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -315,6 +346,6 @@
 
   </main>
 
-  <script src="/app.js"></script>
+  <script src="/app.js?v=1.3"></script>
 </body>
 </html>

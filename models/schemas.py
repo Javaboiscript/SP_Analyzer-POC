@@ -36,6 +36,11 @@ class AnalyzeRequest(BaseModel):
         description="Optional custom query, notes, or specific analytical focus instructions from the user",
         json_schema_extra={"example": "Focus on reasons for item rejection or payment clearance status"}
     )
+    reportId: Optional[str] = Field(
+        None,
+        description="Optional identifier of the specific report to analyze when using a multi-report tool (e.g. 'mis_gate_entry' or 'sales_register')",
+        json_schema_extra={"example": "mis_gate_entry"}
+    )
 
 
 # ---------------------------------------------------------

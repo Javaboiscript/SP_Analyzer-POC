@@ -19,7 +19,13 @@ class GeminiClient:
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY", "")
         self.default_model = os.getenv("GEMINI_MODEL", "gemini-3.1-flash")
-        self.max_prompt_rows = int(os.getenv("MAX_PROMPT_ROWS", "500"))
+        raw_max_rows = os.getenv("MAX_PROMPT_ROWS", "").strip()
+        try:
+            val = int(raw_max_rows)
+            # 0 or negative means unlimited (no cap)
+            self.max_prompt_rows = val if val > 0 else None
+        except (ValueError, TypeError):
+            self.max_prompt_rows = None
         self._client = None
 
     @property
@@ -37,8 +43,9 @@ class GeminiClient:
     def format_tables_for_prompt(self, tables: List[Dict[str, Any]]) -> str:
         """
         Converts multi-resultset SQL tables into a clean, compact Markdown tabular format for LLM reasoning.
-        If any table exceeds self.max_prompt_rows, it truncates the preview to max_prompt_rows and
+        If self.max_prompt_rows is set (> 0) and any table exceeds it, it truncates the preview to max_prompt_rows and
         calculates complete column-level statistics (totals, averages, min, max) for numeric columns.
+        If max_prompt_rows is None (0 or empty in env), all rows are included without capping.
         """
         if not tables:
             return "No data returned by the query."
@@ -57,8 +64,8 @@ class GeminiClient:
                 output_parts.append("_Empty result set (0 rows)._\n")
                 continue
 
-            # Compute column statistics if rows are truncated
-            is_truncated = total_rows > self.max_prompt_rows
+            # Compute column statistics if rows are capped
+            is_truncated = bool(self.max_prompt_rows and total_rows > self.max_prompt_rows)
             display_rows = rows[:self.max_prompt_rows] if is_truncated else rows
 
             if is_truncated:
@@ -200,9 +207,12 @@ class GeminiClient:
         )
 
         sys_prompt = system_prompt or (
-            "You are an expert enterprise data analyst and business intelligence specialist. "
-            "Analyze the provided stored procedure tabular data and answer the user's instructions "
-            "directly, comprehensively, and clearly using clean Markdown."
+            "You are an expert enterprise business intelligence and data analyst.\n"
+            "Analyze the provided stored procedure tabular data and directly answer the user's inquiry.\n\n"
+            "FORMATTING GUIDELINES:\n"
+            "- MAXIMIZE TABLES: Use clean Markdown tables wherever possible to present numbers, comparisons, and item breakdowns.\n"
+            "- BOLD TITLES & SPACING: Use bold Markdown section headers (###) with generous vertical spacing.\n"
+            "- BULLET POINTS: Use crisp bullet points with bold headline prefixes for observations and recommendations—avoid text blobs."
         )
 
         if "{{data}}" in custom_prompt:

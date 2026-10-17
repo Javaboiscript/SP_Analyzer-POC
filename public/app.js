@@ -8,12 +8,15 @@
 const state = {
   tools: [],
   selectedTool: null,
+  selectedReport: null,
   selectedPrompt: null,
   currentAnalysis: null,
   currentRawAnalysis: null,
   currentTables: [],
   activeTableIndex: 0,
   tableFilterQuery: "",
+  tableViewMode: "all",
+  showSqlTables: false,
   companies: []
 };
 
@@ -74,6 +77,11 @@ const el = {
   formFieldsContainer: document.getElementById("form-fields-container"),
   promptsCountBadge: document.getElementById("prompts-count-badge"),
   promptsListContainer: document.getElementById("prompts-list-container"),
+  reportSelectorBar: document.getElementById("report-selector-bar"),
+  reportSelectorTabs: document.getElementById("report-selector-tabs"),
+  paramsColumnTitle: document.getElementById("params-column-title"),
+  promptsColumnTitle: document.getElementById("prompts-column-title"),
+  promptsColumnDesc: document.getElementById("prompts-column-desc"),
   
   // Action Bar
   actionPromptName: document.getElementById("action-prompt-name"),
@@ -93,7 +101,9 @@ const el = {
   statTotalRows: document.getElementById("stat-total-rows"),
   statTableCount: document.getElementById("stat-table-count"),
   btnCopyReport: document.getElementById("btn-copy-report"),
-  btnScrollSql: document.getElementById("btn-scroll-sql"),
+  btnTablesOff: document.getElementById("btn-tables-off"),
+  btnTablesOn: document.getElementById("btn-tables-on"),
+  btnHideTablesCard: document.getElementById("btn-hide-tables-card"),
   executiveSummaryBlock: document.getElementById("executive-summary-block"),
   metricsDeck: document.getElementById("metrics-deck"),
   findingsCountPill: document.getElementById("findings-count-pill"),
@@ -123,13 +133,18 @@ const el = {
   tableSearchInput: document.getElementById("table-search-input"),
   tableRowsInfo: document.getElementById("table-rows-info"),
   dataTableHead: document.getElementById("data-table-head"),
-  dataTableBody: document.getElementById("data-table-body")
+  dataTableBody: document.getElementById("data-table-body"),
+  allTablesContainer: document.getElementById("all-tables-container"),
+  singleTableContainer: document.getElementById("single-table-container"),
+  btnViewAll: document.getElementById("btn-view-all"),
+  btnViewSingle: document.getElementById("btn-view-single")
 };
 
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
   checkDbHealth();
   loadTools();
+  setTablesVisibility(false);
   attachEventListeners();
 });
 
@@ -227,16 +242,25 @@ function openToolWorkspace(toolId) {
   // Workspace top bar update
   el.wsToolIcon.textContent = tool.icon || "🔧";
   el.wsToolName.textContent = tool.label;
-  el.wsSpName.textContent = tool.storedProcedure || "";
 
-  // Render presets
-  renderPresets(toolId);
+  // Check if tool has reports (e.g. report_analyzer)
+  if (tool.reports && tool.reports.length > 0) {
+    if (el.reportSelectorBar) el.reportSelectorBar.style.display = "flex";
+    renderReportSelector(tool);
+    selectReport(tool.reports[0]);
+  } else {
+    // Single-purpose tool (e.g. po_analyzer)
+    if (el.reportSelectorBar) el.reportSelectorBar.style.display = "none";
+    state.selectedReport = null;
+    el.wsSpName.textContent = tool.storedProcedure || "";
+    if (el.paramsColumnTitle) el.paramsColumnTitle.textContent = "01 // Input Parameters";
+    if (el.promptsColumnTitle) el.promptsColumnTitle.textContent = "02 // Analytical Prompt Lens";
+    if (el.promptsColumnDesc) el.promptsColumnDesc.textContent = "Select the analytical focus for Gemini to reason over the returned stored procedure data:";
 
-  // Render parameters form
-  renderParametersForm(tool);
-
-  // Render prompts
-  renderPromptsList(tool);
+    renderPresets(tool);
+    renderParametersForm(tool);
+    renderPromptsList(tool);
+  }
 
   // Hide previous results & errors
   el.resultsSection.classList.remove("active");
@@ -248,15 +272,77 @@ function openToolWorkspace(toolId) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function renderReportSelector(tool) {
+  if (!el.reportSelectorTabs) return;
+  el.reportSelectorTabs.innerHTML = "";
+  (tool.reports || []).forEach((report, idx) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `report-tab-btn ${idx === 0 ? "active" : ""}`;
+    btn.id = `report-tab-${report.id}`;
+    btn.innerHTML = `<span>${report.icon || "📄"}</span> <span>${report.label}</span>`;
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".report-tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      selectReport(report);
+    });
+    el.reportSelectorTabs.appendChild(btn);
+  });
+}
+
+function selectReport(report) {
+  state.selectedReport = report;
+  el.wsSpName.textContent = report.storedProcedure || "";
+  if (el.paramsColumnTitle) el.paramsColumnTitle.textContent = `01 // ${report.label} Parameters`;
+  if (el.promptsColumnTitle) el.promptsColumnTitle.textContent = "02 // Custom Analytical Lens";
+  if (el.promptsColumnDesc) el.promptsColumnDesc.textContent = "Enter your custom analytical questions, requirements, or focus areas for Gemini to reason over this report:";
+
+  renderPresets(report);
+  renderParametersForm(report);
+  renderReportCustomPrompt(report);
+}
+
+function renderReportCustomPrompt(report) {
+  el.promptsListContainer.innerHTML = "";
+  el.promptsCountBadge.textContent = "Custom Prompt";
+  state.selectedPrompt = { id: "custom", label: "Custom Free-form Analysis", isCustom: true };
+  el.actionPromptName.textContent = `Custom Analysis: ${report.label}`;
+
+  const customCard = document.createElement("div");
+  customCard.className = "prompt-select-card custom-prompt-card selected";
+  customCard.id = "prompt-card-custom";
+  customCard.style.cursor = "default";
+  customCard.innerHTML = `
+    <div class="prompt-radio-dot"></div>
+    <div class="prompt-card-details" style="width: 100%;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <h4 style="margin: 0;">✍️ Custom Free-form Analysis</h4>
+        <span style="font-size: 9px; font-weight: 700; background: rgba(1, 51, 40, 0.1); color: var(--color-forest); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Direct LLM</span>
+      </div>
+      <div class="custom-prompt-input-wrapper" style="display: block;">
+        <textarea
+          id="custom-prompt-textarea"
+          class="minimal-input"
+          rows="5"
+          placeholder="e.g. Analyze overall volume, flag lines with delivery delays or high rejections, compare customer totals, or summarize key trends..."
+          style="width: 100%; resize: vertical; min-height: 95px; font-size: 12.5px; line-height: 1.5; padding: 10px 12px; background: #FFFFFF;"
+        ></textarea>
+      </div>
+    </div>
+  `;
+  el.promptsListContainer.appendChild(customCard);
+}
+
 /**
  * Render Presets in Workspace
  */
-function renderPresets(toolId) {
+function renderPresets(target) {
   el.presetsContainer.innerHTML = "";
-  const presets = TOOL_PRESETS[toolId] || [];
+  const toolId = typeof target === "string" ? target : (target ? target.id : "");
+  const presets = (target && target.presets) ? target.presets : (TOOL_PRESETS[toolId] || []);
 
   if (presets.length === 0) {
-    el.presetsContainer.innerHTML = `<span style="font-size:11px; color:var(--color-espresso-faint);">No presets for this tool.</span>`;
+    el.presetsContainer.innerHTML = `<span style="font-size:11px; color:var(--color-espresso-faint);">No presets configured.</span>`;
     return;
   }
 
@@ -313,8 +399,18 @@ function renderParametersForm(tool) {
     const item = document.createElement("div");
     item.className = "form-item";
 
-    // Handle Select Dropdown (e.g. Company from masterdata.mCompanyMaster)
+    // Handle Select Dropdown (e.g. static options or dynamic companies)
     if (param.type === "select") {
+      let optionsHtml = '';
+      if (param.options && param.options.length > 0) {
+        optionsHtml = param.options.map(opt => {
+          const isSel = (param.default !== null && param.default !== undefined && String(param.default) === String(opt.value)) ? "selected" : "";
+          return `<option value="${opt.value}" ${isSel}>${escapeHtml(opt.label)}</option>`;
+        }).join("");
+      } else {
+        optionsHtml = `<option value="">-- All Companies (None / Optional) --</option>`;
+      }
+
       item.innerHTML = `
         <div class="form-item-header">
           <label class="form-item-label" for="param-${param.name}">${param.label || param.name}</label>
@@ -325,10 +421,10 @@ function renderParametersForm(tool) {
           name="${param.name}" 
           class="minimal-input select-dropdown"
         >
-          <option value="">-- All Companies (None / Optional) --</option>
+          ${optionsHtml}
         </select>
         <div class="example-hint">
-          <span>${param.description ? truncate(param.description, 42) : ''}</span>
+          <span>${param.description ? truncate(param.description, 45) : ''}</span>
           <span class="example-fill" data-clear="param-${param.name}">Reset</span>
         </div>
       `;
@@ -338,22 +434,28 @@ function renderParametersForm(tool) {
       if (clearBtn) {
         clearBtn.addEventListener("click", () => {
           const sel = document.getElementById(`param-${param.name}`);
-          if (sel) sel.value = "";
+          if (sel) {
+            sel.value = param.default !== undefined && param.default !== null ? String(param.default) : "";
+          }
         });
       }
 
-      fetchCompanies().then(companies => {
-        const selectEl = document.getElementById(`param-${param.name}`);
-        if (!selectEl) return;
-        selectEl.innerHTML = `<option value="">-- All Companies (None / Optional) --</option>`;
-        companies.forEach(c => {
-          const opt = document.createElement("option");
-          opt.value = c.value;
-          opt.textContent = c.label;
-          selectEl.appendChild(opt);
+      if (param.optionsUrl) {
+        fetchCompanies().then(companies => {
+          const selectEl = document.getElementById(`param-${param.name}`);
+          if (!selectEl) return;
+          selectEl.innerHTML = `<option value="">-- All Companies (None / Optional) --</option>`;
+          companies.forEach(c => {
+            const opt = document.createElement("option");
+            opt.value = c.value;
+            opt.textContent = c.label;
+            if (param.default !== null && param.default !== undefined && String(param.default) === String(c.value)) {
+              opt.selected = true;
+            }
+            selectEl.appendChild(opt);
+          });
         });
-        // Default remains null / empty ("") per user requirement
-      });
+      }
       return;
     }
 
@@ -373,7 +475,7 @@ function renderParametersForm(tool) {
         id="param-${param.name}" 
         name="${param.name}" 
         class="minimal-input" 
-        value=""
+        value="${defVal}"
         placeholder="${defVal !== '' ? 'e.g. ' + defVal : (param.description || param.name)}"
       />
       ${defVal !== "" ? `
@@ -414,18 +516,110 @@ function renderPromptsList(tool) {
 
   // 1. Render predefined prompt cards
   prompts.forEach((p, idx) => {
+    const isSelected = idx === 0;
     const card = document.createElement("div");
-    card.className = `prompt-select-card ${idx === 0 ? "selected" : ""}`;
+    card.className = `prompt-select-card ${isSelected ? "selected" : ""}`;
     card.id = `prompt-card-${p.id}`;
+
+    // Prepare underlying prompt content
+    const sysPrompt = p.systemPrompt ? p.systemPrompt.trim() : "";
+    const userPrompt = p.userPromptTemplate ? p.userPromptTemplate.trim() : "";
+
+    let underlyingHtml = "";
+    let toggleBtnHtml = "";
+    if (sysPrompt || userPrompt) {
+      toggleBtnHtml = `
+        <div class="prompt-toggle-row">
+          <button type="button" class="btn-toggle-prompt-view" data-prompt-id="${p.id}" title="Toggle underlying prompt details">
+            <span class="toggle-icon">👁</span> <span class="toggle-text">View Prompt</span>
+          </button>
+        </div>
+      `;
+      underlyingHtml = `
+        <div class="prompt-underlying-container" id="prompt-underlying-${p.id}" style="display: none;">
+          <div class="prompt-underlying-header">
+            <span class="prompt-underlying-title">📜 Underlying Template Prompt</span>
+            <button type="button" class="btn-copy-underlying" title="Copy full prompt text">📋 Copy</button>
+          </div>
+          <div class="prompt-underlying-body">
+            ${sysPrompt ? `
+              <div class="prompt-underlying-label">⚡ System Directive & Deliverables</div>
+              <pre class="prompt-underlying-pre">${escapeHtml(sysPrompt)}</pre>
+            ` : ''}
+            ${userPrompt ? `
+              <div class="prompt-underlying-label" style="${sysPrompt ? 'margin-top: 8px;' : ''}">💬 User Prompt Template</div>
+              <pre class="prompt-underlying-pre">${escapeHtml(userPrompt)}</pre>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+
     card.innerHTML = `
       <div class="prompt-radio-dot"></div>
-      <div class="prompt-card-details">
+      <div class="prompt-card-details" style="width: 100%;">
         <h4>${p.label}</h4>
         <p>${p.description || ""}</p>
+        ${toggleBtnHtml}
+        ${underlyingHtml}
       </div>
     `;
 
-    card.addEventListener("click", () => {
+    // Toggle View Prompt button listener
+    const toggleBtn = card.querySelector(".btn-toggle-prompt-view");
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+
+        // Also ensure the card is selected
+        state.selectedPrompt = p;
+        document.querySelectorAll(".prompt-select-card").forEach(c => c.classList.remove("selected"));
+        card.classList.add("selected");
+        el.actionPromptName.textContent = p.label;
+
+        // Collapse custom prompt input when a standard template is selected
+        const customWrapper = document.getElementById("custom-prompt-wrapper");
+        if (customWrapper) customWrapper.style.display = "none";
+
+        const myUnderlying = card.querySelector(".prompt-underlying-container");
+        if (!myUnderlying) return;
+
+        const isCurrentlyOpen = myUnderlying.style.display === "block";
+        if (isCurrentlyOpen) {
+          myUnderlying.style.display = "none";
+          toggleBtn.classList.remove("active");
+          toggleBtn.innerHTML = `<span class="toggle-icon">👁</span> <span class="toggle-text">View Prompt</span>`;
+        } else {
+          myUnderlying.style.display = "block";
+          toggleBtn.classList.add("active");
+          toggleBtn.innerHTML = `<span class="toggle-icon">✕</span> <span class="toggle-text">Hide Prompt</span>`;
+        }
+      });
+    }
+
+    // Copy prompt text listener
+    const copyBtn = card.querySelector(".btn-copy-underlying");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const copyParts = [];
+        if (sysPrompt) copyParts.push(`--- SYSTEM DIRECTIVE ---\n${sysPrompt}`);
+        if (userPrompt) copyParts.push(`--- USER PROMPT TEMPLATE ---\n${userPrompt}`);
+        const textToCopy = copyParts.join("\n\n");
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          copyBtn.textContent = "✓ Copied";
+          setTimeout(() => { copyBtn.textContent = "📋 Copy"; }, 1500);
+        }).catch(() => {
+          copyBtn.textContent = "✓ Copied";
+          setTimeout(() => { copyBtn.textContent = "📋 Copy"; }, 1500);
+        });
+      });
+    }
+
+    card.addEventListener("click", (e) => {
+      // Do not deselect or toggle if clicking toggle or copy button
+      if (e.target.closest(".btn-toggle-prompt-view") || e.target.closest(".btn-copy-underlying")) return;
+
       state.selectedPrompt = p;
       document.querySelectorAll(".prompt-select-card").forEach(c => c.classList.remove("selected"));
       card.classList.add("selected");
@@ -450,7 +644,6 @@ function renderPromptsList(tool) {
         <h4 style="margin: 0;">✍️ Custom Free-form Analysis</h4>
         <span style="font-size: 9px; font-weight: 700; background: rgba(204, 139, 101, 0.18); color: var(--color-terracotta-dark); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Unconstrained</span>
       </div>
-      <p style="margin-bottom: 4px;">Define your own analysis prompt without rigid JSON schema constraints. The LLM responds in free-form Markdown.</p>
       <div class="custom-prompt-input-wrapper" id="custom-prompt-wrapper" style="display: none; margin-top: 8px;">
         <textarea
           id="custom-prompt-textarea"
@@ -459,9 +652,6 @@ function renderPromptsList(tool) {
           placeholder="e.g. Focus on vendor delivery turnaround, list all late line items with delay days, and give immediate recommendations..."
           style="width: 100%; resize: vertical; font-size: 12px; line-height: 1.45; padding: 8px 10px; background: #FFFFFF;"
         ></textarea>
-        <div style="font-size: 10.5px; color: var(--color-espresso-faint); margin-top: 4px;">
-          Direct LLM response will be displayed without enforcing predefined schemas.
-        </div>
       </div>
     </div>
   `;
@@ -474,6 +664,13 @@ function renderPromptsList(tool) {
     document.querySelectorAll(".prompt-select-card").forEach(c => c.classList.remove("selected"));
     customCard.classList.add("selected");
     el.actionPromptName.textContent = "Custom Free-form Analysis";
+
+    // Hide any open underlying prompt containers and reset toggle buttons
+    document.querySelectorAll(".prompt-underlying-container").forEach(box => box.style.display = "none");
+    document.querySelectorAll(".btn-toggle-prompt-view").forEach(btn => {
+      btn.classList.remove("active");
+      btn.innerHTML = `<span class="toggle-icon">👁</span> <span class="toggle-text">View Prompt</span>`;
+    });
 
     const customWrapper = document.getElementById("custom-prompt-wrapper");
     if (customWrapper) {
@@ -490,8 +687,9 @@ function renderPromptsList(tool) {
  * Reset Parameters
  */
 function resetParameters() {
-  if (!state.selectedTool) return;
-  (state.selectedTool.params || []).forEach(p => {
+  const activeObj = state.selectedReport || state.selectedTool;
+  if (!activeObj) return;
+  (activeObj.params || []).forEach(p => {
     const input = document.getElementById(`param-${p.name}`);
     if (input) {
       input.value = "";
@@ -505,12 +703,16 @@ function resetParameters() {
 
 function collectParameters() {
   const params = {};
-  if (!state.selectedTool) return params;
+  const activeObj = state.selectedReport || state.selectedTool;
+  if (!activeObj) return params;
 
-  (state.selectedTool.params || []).forEach(p => {
+  (activeObj.params || []).forEach(p => {
     const input = document.getElementById(`param-${p.name}`);
     if (input) {
-      const val = input.value.trim();
+      let val = input.value.trim();
+      if (val === "" && p.default !== undefined && p.default !== null) {
+        val = String(p.default);
+      }
       if (val === "") {
         params[p.name] = null;
       } else if (p.type === "int" || p.type === "select") {
@@ -520,7 +722,7 @@ function collectParameters() {
         params[p.name] = val;
       }
     } else {
-      params[p.name] = null;
+      params[p.name] = p.default !== undefined ? p.default : null;
     }
   });
   return params;
@@ -563,6 +765,7 @@ async function runAnalysis() {
 
   const payload = {
     toolId: state.selectedTool.id,
+    reportId: state.selectedReport ? state.selectedReport.id : null,
     promptId: isCustom ? "custom" : state.selectedPrompt.id,
     params: collectParameters(),
     custom_input: isCustom ? customInputVal : null
@@ -664,6 +867,7 @@ function renderResults(data) {
 
   // SQL Result Tables
   renderSqlTables(state.currentTables);
+  setTablesVisibility(false);
 
   // Show Results Section & Scroll smoothly
   el.resultsSection.classList.add("active");
@@ -820,13 +1024,52 @@ function renderRecommendations(recs) {
 }
 
 /**
- * 5. Render SQL Tables & Tabs
+ * 5. Render SQL Tables & Multi-Table Viewer
  */
+function setTableViewMode(mode) {
+  state.tableViewMode = mode;
+  if (mode === "all") {
+    if (el.btnViewAll) el.btnViewAll.classList.add("active");
+    if (el.btnViewSingle) el.btnViewSingle.classList.remove("active");
+    if (el.allTablesContainer) el.allTablesContainer.style.display = "flex";
+    if (el.singleTableContainer) el.singleTableContainer.style.display = "none";
+  } else {
+    if (el.btnViewSingle) el.btnViewSingle.classList.add("active");
+    if (el.btnViewAll) el.btnViewAll.classList.remove("active");
+    if (el.allTablesContainer) el.allTablesContainer.style.display = "none";
+    if (el.singleTableContainer) el.singleTableContainer.style.display = "block";
+    renderActiveTableRows();
+  }
+}
+
+function setTablesVisibility(show, shouldScroll = false) {
+  state.showSqlTables = Boolean(show);
+
+  if (el.btnTablesOff) {
+    el.btnTablesOff.classList.toggle("active", !state.showSqlTables);
+  }
+  if (el.btnTablesOn) {
+    el.btnTablesOn.classList.toggle("active", state.showSqlTables);
+  }
+
+  if (el.sqlTablesSection) {
+    el.sqlTablesSection.style.display = state.showSqlTables ? "block" : "none";
+  }
+
+  if (state.showSqlTables && shouldScroll && el.sqlTablesSection) {
+    el.sqlTablesSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
 function renderSqlTables(tables) {
   el.resultSetsBadge.textContent = `${tables.length} Table${tables.length === 1 ? '' : 's'}`;
   el.tableTabsContainer.innerHTML = "";
+  if (el.allTablesContainer) el.allTablesContainer.innerHTML = "";
 
   if (tables.length === 0) {
+    if (el.allTablesContainer) {
+      el.allTablesContainer.innerHTML = `<div style="padding:24px; text-align:center; color:var(--color-espresso-muted); font-size:13px; background:#FFFFFF; border-radius:8px;">No records returned by stored procedure.</div>`;
+    }
     el.dataTableHead.innerHTML = "";
     el.dataTableBody.innerHTML = `<tr><td style="padding:16px; text-align:center;">No records returned by stored procedure.</td></tr>`;
     el.tableRowsInfo.textContent = "Showing 0 rows";
@@ -835,10 +1078,12 @@ function renderSqlTables(tables) {
 
   state.activeTableIndex = 0;
 
+  // Render navigation tab chips
   tables.forEach((t, idx) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = `table-tab-chip ${idx === 0 ? "active" : ""}`;
+    chip.id = `table-chip-${idx}`;
     chip.innerHTML = `
       <span>${t.name || `Table ${idx + 1}`}</span>
       <span class="table-row-count-pill">${t.row_count || (t.rows ? t.rows.length : 0)}</span>
@@ -848,15 +1093,118 @@ function renderSqlTables(tables) {
       state.activeTableIndex = idx;
       document.querySelectorAll(".table-tab-chip").forEach(c => c.classList.remove("active"));
       chip.classList.add("active");
-      state.tableFilterQuery = "";
-      el.tableSearchInput.value = "";
-      renderActiveTableRows();
+
+      if (state.tableViewMode === "all") {
+        const targetCard = document.getElementById(`table-card-${idx}`);
+        if (targetCard) {
+          targetCard.scrollIntoView({ behavior: "smooth", block: "start" });
+          targetCard.style.borderColor = "var(--color-terracotta)";
+          setTimeout(() => { targetCard.style.borderColor = ""; }, 1000);
+        }
+      } else {
+        state.tableFilterQuery = "";
+        el.tableSearchInput.value = "";
+        renderActiveTableRows();
+      }
     });
 
     el.tableTabsContainer.appendChild(chip);
   });
 
+  // Render All Tables Stacked
+  renderAllTablesStacked(tables);
+
+  // Render Active Single Table
   renderActiveTableRows();
+
+  // Apply default view mode
+  setTableViewMode(state.tableViewMode || "all");
+}
+
+function renderAllTablesStacked(tables) {
+  if (!el.allTablesContainer) return;
+  el.allTablesContainer.innerHTML = "";
+
+  tables.forEach((t, idx) => {
+    const cols = t.columns || [];
+    const rows = t.rows || [];
+    const rowCount = t.row_count !== undefined ? t.row_count : rows.length;
+
+    const card = document.createElement("div");
+    card.className = "table-individual-card";
+    card.id = `table-card-${idx}`;
+
+    card.innerHTML = `
+      <div class="table-card-subhead">
+        <div class="table-card-subhead-left">
+          <span class="table-idx-badge">Table ${idx + 1}</span>
+          <strong style="font-size:13px; color:var(--color-espresso);">${escapeHtml(t.name || `Table ${idx + 1}`)}</strong>
+          <span class="table-row-count-pill">${rowCount} row${rowCount === 1 ? '' : 's'}</span>
+          <span class="table-col-count-pill">${cols.length} column${cols.length === 1 ? '' : 's'}</span>
+        </div>
+        <div class="table-card-subhead-right">
+          ${rowCount > 0 ? `<input type="text" class="table-search-mini" data-card-idx="${idx}" placeholder="🔍 Filter rows...">` : ''}
+          <button type="button" class="btn-action-sm" data-csv-idx="${idx}" style="font-size:10.5px; padding:3px 10px;">⬇ CSV</button>
+        </div>
+      </div>
+      <div class="table-responsive" style="max-height: 380px;">
+        <table class="pastel-table" id="card-table-${idx}">
+          <thead>
+            <tr>
+              <th style="width:36px; text-align:center;">#</th>
+              ${cols.map(c => `<th>${escapeHtml(c)}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${rowCount === 0 ? `
+              <tr>
+                <td colspan="${cols.length + 1}" style="padding:14px; text-align:center; color:var(--color-espresso-muted); font-style:italic;">
+                  0 records returned for this table (schema defined with ${cols.length} column${cols.length === 1 ? '' : 's'}).
+                </td>
+              </tr>
+            ` : rows.map((row, rIdx) => {
+              const cells = row.map(cell => {
+                const v = cell === null || cell === undefined ? '<span style="color:#aaa;">NULL</span>' : escapeHtml(String(cell));
+                return `<td>${v}</td>`;
+              }).join("");
+              return `<tr><td style="text-align:center; color:var(--color-espresso-faint); font-size:10px;">${rIdx + 1}</td>${cells}</tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    el.allTablesContainer.appendChild(card);
+
+    // CSV export per table card
+    const csvBtn = card.querySelector(`[data-csv-idx="${idx}"]`);
+    if (csvBtn) {
+      csvBtn.addEventListener("click", () => exportTableAsCsv(idx));
+    }
+
+    // Mini search filter per table card
+    const searchInp = card.querySelector(`[data-card-idx="${idx}"]`);
+    if (searchInp) {
+      searchInp.addEventListener("input", (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        const tbody = card.querySelector("tbody");
+        if (!tbody) return;
+
+        const filtered = query === "" ? rows : rows.filter(r => r.some(c => String(c).toLowerCase().includes(query)));
+        if (filtered.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="${cols.length + 1}" style="padding:14px; text-align:center;">No matching records found.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = filtered.map((row, rIdx) => {
+          const cells = row.map(cell => {
+            const v = cell === null || cell === undefined ? '<span style="color:#aaa;">NULL</span>' : escapeHtml(String(cell));
+            return `<td>${v}</td>`;
+          }).join("");
+          return `<tr><td style="text-align:center; color:var(--color-espresso-faint); font-size:10px;">${rIdx + 1}</td>${cells}</tr>`;
+        }).join("");
+      });
+    }
+  });
 }
 
 function renderActiveTableRows() {
@@ -876,7 +1224,7 @@ function renderActiveTableRows() {
   el.dataTableHead.innerHTML = `
     <tr>
       <th style="width:36px; text-align:center;">#</th>
-      ${cols.map(c => `<th>${c}</th>`).join("")}
+      ${cols.map(c => `<th>${escapeHtml(c)}</th>`).join("")}
     </tr>
   `;
 
@@ -885,8 +1233,7 @@ function renderActiveTableRows() {
     return;
   }
 
-  const slice = filtered.slice(0, 200);
-  el.dataTableBody.innerHTML = slice.map((row, rIdx) => {
+  el.dataTableBody.innerHTML = filtered.map((row, rIdx) => {
     const cells = row.map(cell => {
       const v = cell === null || cell === undefined ? '<span style="color:#aaa;">NULL</span>' : escapeHtml(String(cell));
       return `<td>${v}</td>`;
@@ -896,10 +1243,10 @@ function renderActiveTableRows() {
 }
 
 /**
- * CSV Export
+ * CSV Export (Individual Table by Index)
  */
-function exportActiveTableAsCsv() {
-  const table = state.currentTables[state.activeTableIndex];
+function exportTableAsCsv(idx) {
+  const table = state.currentTables[idx];
   if (!table) return;
 
   const cols = table.columns || [];
@@ -914,11 +1261,27 @@ function exportActiveTableAsCsv() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  const name = (table.name || `table_${state.activeTableIndex + 1}`).toLowerCase().replace(/[^a-z0-9]/g, "_");
+  const name = (table.name || `table_${idx + 1}`).toLowerCase().replace(/[^a-z0-9]/g, "_");
   a.download = `${name}_export.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+/**
+ * CSV Export (Active / All)
+ */
+function exportActiveTableAsCsv() {
+  if (state.tableViewMode === "all" && state.currentTables.length > 0) {
+    // Export each table with rows
+    state.currentTables.forEach((t, i) => {
+      if (t.rows && t.rows.length > 0) {
+        setTimeout(() => exportTableAsCsv(i), i * 200);
+      }
+    });
+  } else {
+    exportTableAsCsv(state.activeTableIndex);
+  }
 }
 
 /**
@@ -995,16 +1358,35 @@ function attachEventListeners() {
   el.btnExportCsv.addEventListener("click", exportActiveTableAsCsv);
   el.btnCopyReport.addEventListener("click", copyAiReport);
 
-  // Jump to tables
-  el.btnScrollSql.addEventListener("click", () => {
-    el.sqlTablesSection.scrollIntoView({ behavior: "smooth" });
-  });
+  // Segmented OFF / ON tables toggle
+  if (el.btnTablesOff) {
+    el.btnTablesOff.addEventListener("click", () => setTablesVisibility(false));
+  }
+  if (el.btnTablesOn) {
+    el.btnTablesOn.addEventListener("click", () => setTablesVisibility(true, true));
+  }
+  if (el.btnHideTablesCard) {
+    el.btnHideTablesCard.addEventListener("click", () => {
+      setTablesVisibility(false);
+      if (el.resultsSection) {
+        el.resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  }
 
   // Table search
   el.tableSearchInput.addEventListener("input", (e) => {
     state.tableFilterQuery = e.target.value;
     renderActiveTableRows();
   });
+
+  // Table view mode toggles
+  if (el.btnViewAll) {
+    el.btnViewAll.addEventListener("click", () => setTableViewMode("all"));
+  }
+  if (el.btnViewSingle) {
+    el.btnViewSingle.addEventListener("click", () => setTableViewMode("single"));
+  }
 }
 
 function truncate(str, len) {
@@ -1023,7 +1405,7 @@ function escapeHtml(str) {
 
 function formatParagraphs(text) {
   if (!text) return "";
-  return text.split("\n\n").map(p => `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`).join("");
+  return renderMarkdown(text);
 }
 
 /**
@@ -1073,57 +1455,95 @@ function renderMarkdown(md) {
     return `\n\n${html}\n\n`;
   });
 
-  // 4. Split into paragraphs / blocks
-  const blocks = text.split(/\n{2,}/);
-  const parsedBlocks = blocks.map(block => {
-    block = block.trim();
-    if (!block) return "";
+  // 4. Line-by-line parser to cleanly isolate headings and list blocks
+  const lines = text.split("\n");
+  let html = "";
+  let inUl = false;
+  let inOl = false;
 
-    if (block.startsWith("@@CODEBLOCK_")) {
-      const idxMatch = block.match(/@@CODEBLOCK_(\d+)@@/);
-      if (idxMatch) {
-        return codeBlocks[parseInt(idxMatch[1], 10)];
-      }
+  function closeLists() {
+    if (inUl) { html += "</ul>"; inUl = false; }
+    if (inOl) { html += "</ol>"; inOl = false; }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      closeLists();
+      continue;
     }
 
-    if (block.startsWith("<table")) {
-      return block;
+    if (trimmed.startsWith("@@CODEBLOCK_")) {
+      closeLists();
+      const idxMatch = trimmed.match(/@@CODEBLOCK_(\d+)@@/);
+      if (idxMatch) {
+        html += codeBlocks[parseInt(idxMatch[1], 10)] || "";
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith("<table") || trimmed.startsWith("</table>") || trimmed.startsWith("<tr>") || trimmed.startsWith("<thead") || trimmed.startsWith("<tbody")) {
+      closeLists();
+      html += line;
+      continue;
     }
 
     // Headings
-    if (block.startsWith("#### ")) return `<h4>${inlineMarkdown(block.slice(5))}</h4>`;
-    if (block.startsWith("### ")) return `<h3>${inlineMarkdown(block.slice(4))}</h3>`;
-    if (block.startsWith("## ")) return `<h2>${inlineMarkdown(block.slice(3))}</h2>`;
-    if (block.startsWith("# ")) return `<h1>${inlineMarkdown(block.slice(2))}</h1>`;
+    if (/^####\s+/.test(trimmed)) {
+      closeLists();
+      html += `<h4>${inlineMarkdown(trimmed.replace(/^####\s+/, ""))}</h4>`;
+      continue;
+    }
+    if (/^###\s+/.test(trimmed)) {
+      closeLists();
+      html += `<h3>${inlineMarkdown(trimmed.replace(/^###\s+/, ""))}</h3>`;
+      continue;
+    }
+    if (/^##\s+/.test(trimmed)) {
+      closeLists();
+      html += `<h2>${inlineMarkdown(trimmed.replace(/^##\s+/, ""))}</h2>`;
+      continue;
+    }
+    if (/^#\s+/.test(trimmed)) {
+      closeLists();
+      html += `<h1>${inlineMarkdown(trimmed.replace(/^#\s+/, ""))}</h1>`;
+      continue;
+    }
 
     // Blockquote
-    if (block.startsWith("> ")) {
-      const content = block.split("\n").map(l => l.replace(/^>\s?/, "")).join("<br>");
-      return `<blockquote>${inlineMarkdown(content)}</blockquote>`;
+    if (/^>\s?/.test(trimmed)) {
+      closeLists();
+      html += `<blockquote>${inlineMarkdown(trimmed.replace(/^>\s?/, ""))}</blockquote>`;
+      continue;
     }
 
-    // Unordered List
-    if (/^[-*]\s+/m.test(block)) {
-      const items = block.split("\n").filter(l => l.trim());
-      const lis = items.map(l => `<li>${inlineMarkdown(l.replace(/^[-*]\s+/, ""))}</li>`).join("");
-      return `<ul>${lis}</ul>`;
+    // Unordered List item
+    if (/^[-*]\s+/.test(trimmed)) {
+      if (inOl) { html += "</ol>"; inOl = false; }
+      if (!inUl) { html += "<ul>"; inUl = true; }
+      html += `<li>${inlineMarkdown(trimmed.replace(/^[-*]\s+/, ""))}</li>`;
+      continue;
     }
 
-    // Ordered List
-    if (/^\d+\.\s+/m.test(block)) {
-      const items = block.split("\n").filter(l => l.trim());
-      const lis = items.map(l => `<li>${inlineMarkdown(l.replace(/^\d+\.\s+/, ""))}</li>`).join("");
-      return `<ol>${lis}</ol>`;
+    // Ordered List item
+    if (/^\d+\.\s+/.test(trimmed)) {
+      if (inUl) { html += "</ul>"; inUl = false; }
+      if (!inOl) { html += "<ol>"; inOl = true; }
+      html += `<li>${inlineMarkdown(trimmed.replace(/^\d+\.\s+/, ""))}</li>`;
+      continue;
     }
 
-    // Normal paragraph
-    return `<p>${inlineMarkdown(block).replace(/\n/g, "<br>")}</p>`;
-  });
+    // Normal paragraph line
+    closeLists();
+    html += `<p>${inlineMarkdown(trimmed)}</p>`;
+  }
 
-  let finalHtml = parsedBlocks.join("");
+  closeLists();
 
   // Restore any placeholder that might remain
-  finalHtml = finalHtml.replace(/@@CODEBLOCK_(\d+)@@/g, (_, idx) => codeBlocks[parseInt(idx, 10)] || "");
-  return finalHtml;
+  html = html.replace(/@@CODEBLOCK_(\d+)@@/g, (_, idx) => codeBlocks[parseInt(idx, 10)] || "");
+  return html;
 }
 

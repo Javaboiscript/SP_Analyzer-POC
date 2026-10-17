@@ -74,6 +74,205 @@
           "userPromptTemplate": "You are the Purchase Head. Analyze this purchase order completely.\n\nProvide a summary of the purchase order including:\n- PO Amount\n- Days taken to complete the order\n- Balance Qty\n- No of trips taken\n- Balance Amount\n- Balance Days\n- Lead time (PO to GRN)\n\nGive 5 pointer highlights separately for this PO in the executive summary:\n\n{{data}}"
         }
       ]
+    },
+    {
+      "id": "report_analyzer",
+      "label": "Enterprise Report Analyzer",
+      "icon": "📊",
+      "accentColor": "#013328",
+      "description": "Executes enterprise operational and financial reports (MIS Gate Entry/GRN & Sales Register) with custom AI reasoning",
+      "reports": [
+        {
+          "id": "mis_gate_entry",
+          "label": "MIS Gate Entry & GRN Register",
+          "icon": "📦",
+          "description": "Detailed operational report of vehicle gate entries, challans, material receipts, and inspection status",
+          "overview": "Analyzes vehicle gate inward traffic, challan vs accepted/rejected quantities, inspection delays, and delivery turnaround.",
+          "storedProcedure": "[Inventory].[MISGateEntryGRNRegister]",
+          "defaultParams": {
+            "CompanyNo": 4,
+            "FromDate": "2020-02-06",
+            "ToDate": "2022-02-06",
+            "CategoryNo": 0,
+            "MaterialNatureNo": 0
+          },
+          "params": [
+            {
+              "name": "CompanyNo",
+              "label": "Company",
+              "type": "select",
+              "required": true,
+              "default": 4,
+              "optionsUrl": "/api/companies",
+              "description": "Select Company name"
+            },
+            {
+              "name": "FromDate",
+              "label": "From Date",
+              "type": "date",
+              "required": true,
+              "default": "2020-02-06",
+              "description": "Report start date"
+            },
+            {
+              "name": "ToDate",
+              "label": "To Date",
+              "type": "date",
+              "required": true,
+              "default": "2022-02-06",
+              "description": "Report end date"
+            },
+            {
+              "name": "CategoryNo",
+              "label": "Category No",
+              "type": "int",
+              "required": false,
+              "default": 0,
+              "description": "Item category filter (0 = all categories)"
+            },
+            {
+              "name": "MaterialNatureNo",
+              "label": "Material Nature No",
+              "type": "int",
+              "required": false,
+              "default": 0,
+              "description": "Material nature filter (0 = all natures)"
+            }
+          ],
+          "presets": [
+            {
+              "name": "Gate Entry (2020 - 2022)",
+              "values": {
+                "CompanyNo": 4,
+                "FromDate": "2020-02-06",
+                "ToDate": "2022-02-06",
+                "CategoryNo": 0,
+                "MaterialNatureNo": 0
+              }
+            },
+            {
+              "name": "FY 2021 - 2022 Sample",
+              "values": {
+                "CompanyNo": 4,
+                "FromDate": "2021-04-01",
+                "ToDate": "2022-03-31",
+                "CategoryNo": 0,
+                "MaterialNatureNo": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "sales_register",
+          "label": "Sales Register Report",
+          "icon": "📈",
+          "description": "Sales register breakdown, tax invoices, customer locations, tax books, and GST accounting details",
+          "overview": "Analyzes sales turnover, customer invoice distributions, tax books, invoice types, and GST figures.",
+          "storedProcedure": "[Finance].[SalesRegisterReport]",
+          "defaultParams": {
+            "CompanyNo": 4,
+            "FromDate": "2015-04-01",
+            "ToDate": "2018-10-31",
+            "CustomerLocationNo": 0,
+            "InvoiceType": 0,
+            "TaxBookNo": 0,
+            "IsMisReport": 1
+          },
+          "params": [
+            {
+              "name": "CompanyNo",
+              "label": "Company",
+              "type": "select",
+              "required": true,
+              "default": 4,
+              "optionsUrl": "/api/companies",
+              "description": "Select Company name"
+            },
+            {
+              "name": "FromDate",
+              "label": "From Date",
+              "type": "date",
+              "required": true,
+              "default": "2015-04-01",
+              "description": "Sales start date"
+            },
+            {
+              "name": "ToDate",
+              "label": "To Date",
+              "type": "date",
+              "required": true,
+              "default": "2018-10-31",
+              "description": "Sales end date"
+            },
+            {
+              "name": "CustomerLocationNo",
+              "label": "Customer Location No",
+              "type": "int",
+              "required": false,
+              "default": 0,
+              "description": "Customer location (0 = all locations)"
+            },
+            {
+              "name": "InvoiceType",
+              "label": "Invoice Type",
+              "type": "select",
+              "required": false,
+              "default": 0,
+              "options": [
+                { "value": 0, "label": "0 — All Invoice Types" },
+                { "value": 1, "label": "1 — Tax Invoice (Regular & Returns)" },
+                { "value": 2, "label": "2 — Commercial Invoice" },
+                { "value": 3, "label": "3 — E1 Export / Interstate Invoice" },
+                { "value": 4, "label": "4 — Supplementary Invoice" }
+              ],
+              "description": "Select invoice category (0 = All, 1 = Tax, 2 = Commercial, 3 = E1, 4 = Supplementary)"
+            },
+            {
+              "name": "TaxBookNo",
+              "label": "Tax Book No",
+              "type": "int",
+              "required": false,
+              "default": 0,
+              "description": "Tax Book (0 = all)"
+            },
+            {
+              "name": "IsMisReport",
+              "label": "Is MIS Report",
+              "type": "int",
+              "required": false,
+              "default": 1,
+              "description": "1 = MIS Report format, 0 = standard"
+            }
+          ],
+          "presets": [
+            {
+              "name": "Sales Register (2015 - 2018)",
+              "values": {
+                "CompanyNo": 4,
+                "FromDate": "2015-04-01",
+                "ToDate": "2018-10-31",
+                "CustomerLocationNo": 0,
+                "InvoiceType": 0,
+                "TaxBookNo": 0,
+                "IsMisReport": 1
+              }
+            },
+            {
+              "name": "Tax Invoices (InvoiceType=1)",
+              "values": {
+                "CompanyNo": 4,
+                "FromDate": "2017-07-01",
+                "ToDate": "2018-03-31",
+                "CustomerLocationNo": 0,
+                "InvoiceType": 1,
+                "TaxBookNo": 0,
+                "IsMisReport": 1
+              }
+            }
+          ]
+        }
+      ],
+      "prompts": []
     }
   ]
 }
