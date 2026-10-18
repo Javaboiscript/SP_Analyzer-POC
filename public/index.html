@@ -5,347 +5,267 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SP Analyzer // AI Stored Procedure Reasoning Studio</title>
   <meta name="description" content="AI-Powered Stored Procedure Analyzer & Enterprise Reasoning Studio with Google Gemini and SQL Server.">
-  <link rel="stylesheet" href="/styles.css?v=1.2">
+  <link rel="stylesheet" href="/styles.css?v=2.0">
 </head>
-<body>
+<body class="chatbot-app-shell">
 
-  <!-- Top Global Header -->
-  <header class="app-header">
-    <div class="header-inner">
-      <div class="header-left">
-        <div class="brand-wrapper" id="brand-home-link" title="Return to Tools Hub">
+  <!-- ====================================================================
+       FULL SCREEN CHATBOT APP SHELL (100dvh / 100vw)
+       ==================================================================== -->
+  <div class="chatbot-layout" id="chatbot-layout">
+
+    <!-- ==================================================================
+         LEFT COLLAPSIBLE SIDEBAR: Tools, Parameters & Presets
+         ================================================================== -->
+    <aside class="chat-sidebar" id="chat-sidebar">
+      <!-- Sidebar Top Header -->
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
           <div class="brand-avatar">🔬</div>
-          <span class="brand-title">SP Analyzer</span>
+          <div class="brand-text">
+            <span class="brand-title">SP Analyzer</span>
+            <span class="brand-sub">Gemini Enterprise AI</span>
+          </div>
         </div>
-
-        <!-- Back to Tools Button (shown when viewing tool workspace) -->
-        <button type="button" class="header-btn-back" id="btn-header-back">
-          ← Back to Tools
+        <button type="button" class="btn-sidebar-icon" id="btn-collapse-sidebar" title="Collapse Sidebar">
+          ◀
         </button>
       </div>
 
-      <div class="header-right">
-        <!-- Active Tool Pill (shown when tool selected) -->
-        <div class="active-tool-indicator" id="header-active-tool">
-          <span id="header-tool-icon">📋</span>
-          <span id="header-tool-name">Purchase Order Analyzer</span>
+      <!-- Action Button: New Analysis -->
+      <div class="sidebar-actions">
+        <button type="button" class="btn-new-chat" id="btn-new-chat">
+          <span class="btn-icon">＋</span>
+          <span>New Analysis</span>
+        </button>
+      </div>
+
+      <!-- Scrollable Sidebar Body -->
+      <div class="sidebar-scrollable">
+
+        <!-- Tool Selection Section -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">
+            <span>Enterprise Tools</span>
+          </div>
+          <div class="sidebar-tool-list" id="sidebar-tool-list">
+            <!-- Dynamically populated tool pills -->
+          </div>
         </div>
 
-        <!-- Live DB Status -->
+        <!-- Sub-Report Switcher (for tools with multiple reports e.g. Report Analyzer) -->
+        <div class="sidebar-section" id="sidebar-reports-section" style="display:none;">
+          <div class="sidebar-section-title">
+            <span>Report Category</span>
+          </div>
+          <div class="sidebar-reports-list" id="sidebar-reports-list">
+            <!-- Dynamically populated report buttons -->
+          </div>
+        </div>
+
+        <!-- Active Context & Parameters Drawer -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <div class="sidebar-section-title">
+              <span>Target Parameters</span>
+            </div>
+            <button type="button" class="btn-text-action" id="btn-reset-params">↺ Reset</button>
+          </div>
+
+          <!-- Example Presets Row -->
+          <div class="sidebar-presets-box">
+            <span class="presets-caption">⚡ Example Presets:</span>
+            <div class="sidebar-presets-chips" id="sidebar-presets-chips">
+              <!-- Dynamically populated preset buttons -->
+            </div>
+          </div>
+
+          <!-- Dynamic Parameter Inputs Form -->
+          <form id="analyzer-form" class="sidebar-params-form" onsubmit="event.preventDefault();">
+            <div id="sidebar-form-fields">
+              <!-- Dynamically populated input fields -->
+            </div>
+          </form>
+        </div>
+
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
         <div class="status-indicator" id="db-status-badge">
           <span class="status-dot" id="db-status-dot"></span>
           <span id="db-status-text">Checking Database...</span>
         </div>
-
-        <a href="/docs" target="_blank" class="link-api-docs">
+        <a href="/docs" target="_blank" class="link-api-docs" title="Interactive Swagger API Documentation">
           API ↗
         </a>
       </div>
-    </div>
-  </header>
+    </aside>
 
-  <!-- Master Canvas Area -->
-  <main class="main-canvas">
+    <!-- ==================================================================
+         MAIN CHAT CONVERSATION AREA
+         ================================================================== -->
+    <main class="chat-main" id="chat-main">
 
-    <!-- ====================================================================
-         VIEW 1: TOOL SELECTION HUB (Initial Canvas)
-         ==================================================================== -->
-    <section class="view-tool-hub" id="view-tool-hub">
-      <div class="hub-hero">
-        <div class="hub-pill-badge">
-          ✨ Google Gemini Enterprise Reasoning
-        </div>
-        <h1>Purchase Order Intelligence Hub</h1>
-        <p>
-          Inspect full PO lifecycle data directly from SQL Server, run specialized analytical prompts, and generate structured executive reports.
-        </p>
-      </div>
-
-      <!-- Dynamic Tool Cards Grid -->
-      <div class="tool-cards-grid" id="tools-hub-grid">
-        <!-- Populated dynamically from /api/tools -->
-      </div>
-    </section>
-
-    <!-- ====================================================================
-         VIEW 2: TOOL WORKSPACE (Parameters + Prompts + Results)
-         ==================================================================== -->
-    <section class="view-tool-workspace" id="view-tool-workspace">
-
-      <!-- Workspace Top Bar -->
-      <div class="workspace-top-bar">
-        <div class="workspace-active-tool">
-          <div class="workspace-tool-icon" id="ws-tool-icon">📋</div>
-          <div class="workspace-tool-info">
-            <h2 id="ws-tool-name">Purchase Order Analyzer</h2>
-            <span id="ws-sp-name">[Purchase].[AI_PurchaseOrderInsight]</span>
+      <!-- Chat Top Navigation Bar -->
+      <header class="chat-header">
+        <div class="chat-header-left">
+          <button type="button" class="btn-sidebar-toggle" id="btn-expand-sidebar" title="Expand Sidebar" style="display:none;">
+            ☰
+          </button>
+          <div class="chat-header-tool-badge">
+            <span class="tool-icon" id="chat-header-tool-icon">📋</span>
+            <span class="tool-name" id="chat-header-tool-title">Purchase Order Analyzer</span>
           </div>
+          <span class="chat-header-sp-badge" id="chat-header-sp-badge">[Purchase].[AI_PurchaseOrderInsight]</span>
         </div>
 
-        <button type="button" class="btn-back-hub" id="btn-ws-back">
-          ← Back to Tools
-        </button>
-      </div>
+        <div class="chat-header-right">
+          <!-- Active Context Pill (Click to open sidebar parameters) -->
+          <button type="button" class="active-context-pill" id="active-context-pill" title="Click to view/edit parameters in sidebar">
+            <span class="context-dot">●</span>
+            <span id="active-context-summary">PO #1644</span>
+          </button>
 
-      <!-- Sub-Report Switcher (shown when tool has multiple reports e.g. Report Analyzer) -->
-      <div class="report-selector-bar" id="report-selector-bar" style="display:none;">
-        <span class="report-selector-label">📊 Select Report to Analyze:</span>
-        <div class="report-selector-tabs" id="report-selector-tabs">
-          <!-- Dynamically populated report buttons -->
+          <!-- Latest Raw SQL Tables Quick-Toggle (visible if last message has tables) -->
+          <button type="button" class="btn-header-action" id="btn-header-view-tables" style="display:none;" title="Toggle Raw SQL Tables">
+            📊 View SQL Tables
+          </button>
+
+          <!-- Clear Conversation Button -->
+          <button type="button" class="btn-header-action" id="btn-clear-chat" title="Clear conversation stream">
+            🗑 Clear
+          </button>
         </div>
-      </div>
+      </header>
 
-      <!-- 2-Column Setup Grid: Parameters Form Left, Prompts Right -->
-      <div class="workspace-grid">
+      <!-- Scrollable Message Stream -->
+      <div class="chat-stream-container" id="chat-stream-container">
+        <div class="chat-stream-inner">
 
-        <!-- LEFT COLUMN: Parameters Form -->
-        <div class="workspace-card">
-          <div class="workspace-card-head">
-            <div class="workspace-card-title">
-              <span id="params-column-title">01 // Input Parameters</span>
+          <!-- Welcome Hero / Starter Card (Shown when conversation is empty) -->
+          <div class="chat-welcome-hero" id="chat-welcome-hero">
+            <div class="welcome-badge">
+              <span>✨ Google Gemini Enterprise Reasoning</span>
             </div>
-            <button type="button" id="btn-reset-params" style="background:none; border:none; color:var(--color-terracotta-dark); font-size:11px; font-weight:700; cursor:pointer;">
-              ↺ Reset
+            <h1 id="welcome-title">Purchase Order Intelligence Assistant</h1>
+            <p id="welcome-description">
+              Select an analytical lens or type a custom question below to reason directly over SQL Server stored procedures and inspect line fulfillment, vendor punctuality, and financial reconciliation.
+            </p>
+
+            <!-- Quick Starter Prompt Cards Grid -->
+            <div class="starter-prompts-grid" id="starter-prompts-grid">
+              <!-- Dynamically populated from active tool's prompts -->
+            </div>
+          </div>
+
+          <!-- Dynamic Chat Message Bubbles List -->
+          <div class="chat-messages-list" id="chat-messages-list">
+            <!-- Dynamically populated user & assistant message turns -->
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Bottom Chat Composer Area (Pinned) -->
+      <footer class="chat-composer-area" id="chat-composer-area">
+        <div class="composer-container">
+
+          <!-- Composer Top Controls Bar: Lens Selector & Context Pill -->
+          <div class="composer-toolbar">
+            <div class="lens-dropdown-wrapper">
+              <button type="button" class="btn-lens-selector" id="btn-lens-selector">
+                <span class="lens-sparkle">✨</span>
+                <span class="lens-label-current" id="composer-selected-lens-label">Comprehensive PO Health &amp; Lifecycle Audit</span>
+                <span class="lens-chevron">▾</span>
+              </button>
+
+              <!-- Lens Popover Menu -->
+              <div class="lens-popover-menu" id="lens-popover-menu" style="display:none;">
+                <div class="lens-menu-header">Select Analytical Lens</div>
+                <div class="lens-menu-items" id="lens-menu-items">
+                  <!-- Dynamically populated prompt lenses -->
+                </div>
+              </div>
+            </div>
+
+            <div class="composer-context-tag" id="composer-context-tag" title="Target parameter for this analysis">
+              <span class="tag-label">Target:</span>
+              <strong id="composer-context-value">PO #1644</strong>
+            </div>
+          </div>
+
+          <!-- Composer Input Row -->
+          <div class="composer-input-row">
+            <textarea
+              class="composer-textarea"
+              id="composer-input"
+              rows="1"
+              placeholder="Ask a question about this PO or click send to run selected lens... (Press Enter to send)"
+            ></textarea>
+
+            <button type="button" class="btn-composer-send" id="btn-composer-send" title="Run AI Analysis (Enter)">
+              <span class="send-icon">➤</span>
             </button>
           </div>
 
-          <div class="workspace-card-body">
-            <!-- Preset Pills -->
-            <div class="presets-box">
-              <span class="presets-label">⚡ Example Presets:</span>
-              <div class="presets-chips-row" id="presets-container">
-                <!-- Dynamically populated preset buttons -->
-              </div>
-            </div>
-
-            <!-- Parameters Input Fields -->
-            <form id="analyzer-form" onsubmit="event.preventDefault();">
-              <div class="params-form-grid" id="form-fields-container">
-                <!-- Dynamically populated input fields -->
-              </div>
-            </form>
-
-          </div>
-        </div>
-
-        <!-- RIGHT COLUMN: Prompts List / Custom Lens -->
-        <div class="workspace-card">
-          <div class="workspace-card-head">
-            <div class="workspace-card-title">
-              <span id="prompts-column-title">02 // Analytical Prompt Lens</span>
-            </div>
-            <span id="prompts-count-badge" style="font-size:11px; color:var(--color-espresso-muted); font-weight:600;">6 Prompts</span>
+          <!-- Composer Footer Hint -->
+          <div class="composer-hint">
+            <span>Press <kbd>Enter</kbd> to run analysis • <kbd>Shift + Enter</kbd> for new line • Powered by Google Gemini &amp; SQL Server</span>
           </div>
 
-          <div class="workspace-card-body">
-            <p id="prompts-column-desc" style="font-size:12.5px; color:var(--color-espresso-muted);">
-              Select the analytical focus for Gemini to reason over the returned stored procedure data:
-            </p>
-            <div class="prompts-list" id="prompts-list-container">
-              <!-- Dynamically populated prompt cards -->
-            </div>
+        </div>
+      </footer>
+
+    </main>
+
+  </div>
+
+  <!-- Raw SQL Tables Modal / Slide-out Viewer (Accessible globally or per message) -->
+  <div class="sql-modal-backdrop" id="sql-modal-backdrop" style="display:none;">
+    <div class="sql-modal-dialog">
+      <div class="sql-modal-header">
+        <div class="sql-modal-title">
+          <span>📊 Raw SQL Result Sets</span>
+          <span class="table-row-count-pill" id="modal-result-sets-badge">0 Tables</span>
+        </div>
+        <div class="sql-modal-actions">
+          <div class="table-view-toggle-pills">
+            <button type="button" class="btn-toggle-chip active" id="modal-btn-view-all">📑 All Tables</button>
+            <button type="button" class="btn-toggle-chip" id="modal-btn-view-single">🗂 Single Table</button>
           </div>
-        </div>
-
-      </div>
-
-
-      <!-- Action Bar -->
-      <div class="workspace-action-bar">
-        <div class="action-bar-prompt">
-          <span class="action-bar-label">Selected Analytical Lens</span>
-          <span class="action-bar-title" id="action-prompt-name">Select a prompt above</span>
-        </div>
-
-        <button type="button" class="btn-execute-analysis" id="btn-run-analysis">
-          <span>Run AI Analysis</span>
-          <span>➤</span>
-        </button>
-      </div>
-
-      <!-- Loading State Indicator -->
-      <div class="loading-indicator-card" id="loading-box">
-        <div class="pulse-spinner"></div>
-        <div class="loading-text" id="loading-status-text">
-          Executing stored procedure on SQL Server & synthesizing Gemini insights...
+          <button type="button" class="btn-action-sm" id="modal-btn-export-csv">⬇ Export CSV</button>
+          <button type="button" class="btn-close-modal" id="modal-btn-close">✕</button>
         </div>
       </div>
 
-      <!-- Error Alert Card -->
-      <div class="error-alert-card" id="error-box">
-        <div class="error-card-title" id="error-title">Execution Error</div>
-        <div class="error-card-detail" id="error-detail"></div>
+      <div class="sql-modal-body">
+        <div class="table-pill-tabs" id="modal-table-tabs-container">
+          <!-- Dynamically populated table tabs -->
+        </div>
+
+        <!-- All Tables Stacked Container -->
+        <div id="modal-all-tables-container" class="all-tables-container">
+          <!-- Stacked cards -->
+        </div>
+
+        <!-- Single Table Container -->
+        <div id="modal-single-table-container" style="display:none;">
+          <div class="table-toolbar-pastel">
+            <input type="text" class="table-search-pastel" id="modal-table-search-input" placeholder="🔍 Search records in this table...">
+            <span id="modal-table-rows-info" style="font-size:11px; color:var(--color-espresso-muted); font-weight:600;">Showing 0 rows</span>
+          </div>
+          <div class="table-responsive">
+            <table class="pastel-table" id="modal-data-table">
+              <thead id="modal-data-table-head"></thead>
+              <tbody id="modal-data-table-body"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
+    </div>
+  </div>
 
-      <!-- RESULTS PRESENTATION SECTION -->
-      <div class="results-section" id="results-section">
-
-        <!-- Performance & Meta Bar -->
-        <div class="results-meta-bar">
-          <div class="results-meta-left">
-            <span class="results-meta-title">★ Gemini Executive Analysis</span>
-          </div>
-
-          <div class="results-stat-group">
-            <span class="stat-pill">SQL: <strong id="stat-sql-time">0 ms</strong></span>
-            <span class="stat-pill">AI: <strong id="stat-ai-time">0 ms</strong></span>
-            <span class="stat-pill">Rows: <strong id="stat-total-rows">0</strong></span>
-            <span class="stat-pill">Tables: <strong id="stat-table-count">0</strong></span>
-          </div>
-
-          <div class="results-actions-right">
-            <div class="toggle-pill-segmented" id="tables-toggle-group" title="Toggle raw SQL tables display">
-              <span class="toggle-pill-label">Tables</span>
-              <div class="toggle-pill-switch">
-                <button type="button" class="toggle-switch-btn active" id="btn-tables-off" title="Hide raw SQL tables">OFF</button>
-                <button type="button" class="toggle-switch-btn" id="btn-tables-on" title="Show raw SQL tables">ON</button>
-              </div>
-            </div>
-            <button type="button" class="btn-action-sm" id="btn-copy-report">📋 Copy Briefing</button>
-          </div>
-        </div>
-
-        <!-- Unstructured Raw AI Response Block (shown when Custom Prompt is executed without schema enforcement) -->
-        <div class="raw-analysis-container" id="raw-analysis-container" style="display:none;">
-          <div class="raw-analysis-header">
-            <div class="raw-analysis-title">
-              <span class="raw-analysis-badge">✍️ Custom Prompt Output</span>
-              <span class="raw-analysis-subtitle">Direct Unconstrained LLM Analysis</span>
-            </div>
-          </div>
-          <div class="raw-analysis-content" id="raw-analysis-content">
-            <!-- Rendered Markdown from Gemini -->
-          </div>
-        </div>
-
-        <!-- Structured Results Container (shown for predefined prompt templates) -->
-        <div id="structured-results-container">
-          <!-- Custom Query Response Banner (if custom input was provided with template) -->
-          <div class="custom-response-card" id="custom-response-card" style="display:none; margin-bottom: 20px; background: rgba(1, 51, 40, 0.05); border: 1.5px solid var(--color-forest-green); border-radius: 12px; padding: 16px 20px;">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-              <span style="font-size:16px;">💬</span>
-              <strong style="color:var(--color-forest-green); font-size:12.5px; text-transform:uppercase; letter-spacing:0.04em;">Answer to Custom Inquiry</strong>
-            </div>
-            <div id="custom-response-text" style="font-size:13.5px; color:var(--color-espresso); line-height:1.55;"></div>
-          </div>
-
-          <!-- Executive Narrative Summary -->
-          <div class="narrative-card" id="executive-summary-block">
-            <!-- Populated from analysis.executive_summary -->
-          </div>
-
-          <!-- KPI Metrics Cards Deck -->
-          <div class="metrics-deck" id="metrics-deck">
-            <!-- Populated from analysis.key_metrics -->
-          </div>
-
-          <!-- Structured Line-Level & Reconciliation Breakdown Table -->
-          <div class="breakdown-card" id="breakdown-table-container" style="display:none;">
-            <div class="breakdown-card-header">
-              <div class="breakdown-card-title">
-                <span id="breakdown-table-title">📊 Structured Analysis Breakdown</span>
-                <span class="table-row-count-pill" id="breakdown-count-pill">0 items</span>
-              </div>
-            </div>
-            <div class="breakdown-table-wrapper">
-              <table class="breakdown-data-table">
-                <thead id="breakdown-table-head"></thead>
-                <tbody id="breakdown-table-body"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Findings & Recommendations Twin Grid -->
-          <div class="insights-deck">
-            <!-- Findings Column -->
-            <div class="insight-subcard">
-              <div class="insight-subcard-title">
-                <span>🔍 Key Findings & Risk Items</span>
-                <span id="findings-count-pill" style="font-size:11px; color:var(--color-espresso-muted);">0</span>
-              </div>
-              <div class="finding-pill-row" id="findings-list">
-                <!-- Populated from analysis.findings -->
-              </div>
-            </div>
-
-            <!-- Recommendations Column -->
-            <div class="insight-subcard">
-              <div class="insight-subcard-title">
-                <span>🎯 Actionable Recommendations</span>
-                <span id="recs-count-pill" style="font-size:11px; color:var(--color-espresso-muted);">0</span>
-              </div>
-              <div class="finding-pill-row" id="recommendations-list">
-                <!-- Populated from analysis.recommendations -->
-              </div>
-            </div>
-          </div>
-
-          <!-- Supplementary Audit Notes -->
-          <div id="supplementary-notes-container" style="display:none; font-size:12px; color:var(--color-espresso-muted); background:#FFFFFF; border:var(--border-light); padding:12px 16px; border-radius:var(--radius-sm);">
-            <strong>📝 Supplementary Audit Notes:</strong> <span id="supplementary-notes-text"></span>
-          </div>
-        </div>
-
-
-        <!-- SQL Result Sets Multi-Table Viewer (Hidden by default) -->
-        <div class="sql-tables-card" id="sql-tables-section" style="display:none;">
-          <div class="sql-card-header">
-            <div class="sql-card-title">
-              <span>📊 Raw SQL Result Sets</span>
-              <span class="table-row-count-pill" id="result-sets-badge">0 Tables</span>
-            </div>
-            <div class="sql-header-actions" style="display:flex; align-items:center; gap:8px;">
-              <div class="table-view-toggle-pills" id="table-view-toggle">
-                <button type="button" class="btn-toggle-chip active" id="btn-view-all" title="Display all returned result tables stacked">📑 All Tables</button>
-                <button type="button" class="btn-toggle-chip" id="btn-view-single" title="Focus on one table at a time via tabs">🗂 Single Table</button>
-              </div>
-              <button type="button" class="btn-action-sm" id="btn-export-csv" style="font-size:11px;">
-                ⬇ Export CSV
-              </button>
-              <button type="button" class="btn-close-tables" id="btn-hide-tables-card" title="Hide raw SQL tables">
-                ✕ Hide
-              </button>
-            </div>
-          </div>
-
-          <!-- Table Tabs / Quick-Jump Bar -->
-          <div class="table-pill-tabs" id="table-tabs-container">
-            <!-- Dynamically populated table tabs with jump or tab behavior -->
-          </div>
-
-          <!-- All Tables Stacked Container (Default) -->
-          <div id="all-tables-container" class="all-tables-container">
-            <!-- Dynamically populated cards for all tables -->
-          </div>
-
-          <!-- Single Table Focused View (when toggled) -->
-          <div id="single-table-container" style="display:none;">
-            <!-- Table Filter Toolbar -->
-            <div class="table-toolbar-pastel">
-              <input type="text" class="table-search-pastel" id="table-search-input" placeholder="🔍 Search records in this table...">
-              <span id="table-rows-info" style="font-size:11px; color:var(--color-espresso-muted); font-weight:600;">Showing 0 rows</span>
-            </div>
-
-            <!-- Responsive Scrollable Data Table -->
-            <div class="table-responsive">
-              <table class="pastel-table" id="data-table">
-                <thead id="data-table-head">
-                  <!-- Columns -->
-                </thead>
-                <tbody id="data-table-body">
-                  <!-- Rows -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-    </section>
-
-  </main>
-
-  <script src="/app.js?v=1.3"></script>
+  <script src="/app.js?v=2.0"></script>
 </body>
 </html>
