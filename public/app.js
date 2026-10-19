@@ -854,13 +854,13 @@ function appendAssistantMessage(data, promptLabel, params) {
             </thead>
             <tbody>
               ${breakdownRows.map(r => {
-                const tag = (r.status_tag || "").toUpperCase();
-                let tagClass = "tag-info";
-                if (["COMPLETED", "MATCHED", "ON_TIME", "ACCEPTED", "FULLY_RECEIVED"].some(s => tag.includes(s))) tagClass = "tag-success";
-                else if (["PENDING", "WAITING", "UNBILLED", "PARTIAL"].some(s => tag.includes(s))) tagClass = "tag-warning";
-                else if (["OVERDUE", "REJECTED", "CANCELLED", "DELAYED"].some(s => tag.includes(s))) tagClass = "tag-danger";
+        const tag = (r.status_tag || "").toUpperCase();
+        let tagClass = "tag-info";
+        if (["COMPLETED", "MATCHED", "ON_TIME", "ACCEPTED", "FULLY_RECEIVED"].some(s => tag.includes(s))) tagClass = "tag-success";
+        else if (["PENDING", "WAITING", "UNBILLED", "PARTIAL"].some(s => tag.includes(s))) tagClass = "tag-warning";
+        else if (["OVERDUE", "REJECTED", "CANCELLED", "DELAYED"].some(s => tag.includes(s))) tagClass = "tag-danger";
 
-                return `
+        return `
                   <tr>
                     <td><strong>${escapeHtml(r.item_or_category || "—")}</strong></td>
                     <td>${escapeHtml(r.col1_value || "—")}</td>
@@ -871,7 +871,7 @@ function appendAssistantMessage(data, promptLabel, params) {
                     </td>
                   </tr>
                 `;
-              }).join("")}
+      }).join("")}
             </tbody>
           </table>
         </div>
@@ -897,8 +897,8 @@ function appendAssistantMessage(data, promptLabel, params) {
         </div>
         <div class="finding-pill-row">
           ${(analysis.findings || []).map(f => {
-            const sev = (f.severity || "info").toLowerCase();
-            return `
+        const sev = (f.severity || "info").toLowerCase();
+        return `
               <div class="finding-bubble ${sev}">
                 <div class="finding-bubble-header">
                   <strong>${escapeHtml(f.title)}</strong>
@@ -907,7 +907,7 @@ function appendAssistantMessage(data, promptLabel, params) {
                 <p>${escapeHtml(f.description)}</p>
               </div>
             `;
-          }).join("") || `<span style="font-size:12px; color:var(--color-espresso-muted);">No risk findings identified.</span>`}
+      }).join("") || `<span style="font-size:12px; color:var(--color-espresso-muted);">No risk findings identified.</span>`}
         </div>
       `;
       insightsDeck.appendChild(findingsSub);
@@ -922,8 +922,8 @@ function appendAssistantMessage(data, promptLabel, params) {
         </div>
         <div class="finding-pill-row">
           ${(analysis.recommendations || []).map(r => {
-            const pri = (r.priority || "medium").toLowerCase();
-            return `
+        const pri = (r.priority || "medium").toLowerCase();
+        return `
               <div class="rec-bubble">
                 <div class="rec-bubble-top">
                   <span class="rec-bubble-action">${escapeHtml(r.action)}</span>
@@ -932,7 +932,7 @@ function appendAssistantMessage(data, promptLabel, params) {
                 ${r.expected_impact ? `<div style="font-size:11px; color:var(--color-espresso-muted); margin-top:3px;">${escapeHtml(r.expected_impact)}</div>` : ""}
               </div>
             `;
-          }).join("") || `<span style="font-size:12px; color:var(--color-espresso-muted);">No specific actions recommended.</span>`}
+      }).join("") || `<span style="font-size:12px; color:var(--color-espresso-muted);">No specific actions recommended.</span>`}
         </div>
       `;
       insightsDeck.appendChild(recsSub);
